@@ -888,6 +888,18 @@ class Fax(object):
         print( 'Return {} bytes'.format( len(data)) )
         return(self.Result)
     
+def paethPredictor(left, up, up_left):
+    p = left + up - up_left
+    dist_left = abs(p - left)
+    dist_up = abs(p - up)
+    dist_up_left = abs(p - up_left)
+
+    if dist_left <= dist_up and dist_left <= dist_up_left:
+        return left
+    elif dist_up <= dist_up_left:
+        return up
+    else:
+        return up_left
 
         
             
