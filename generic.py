@@ -198,12 +198,12 @@ class ArrayObject(list, PdfObject):
             tok = stream.read(1)
             while tok.isspace():
                 tok = stream.read(1)
-            stream.seek(-1, 1)
+            #stream.seek(-1, 1)
             # check for array ending
             #tok = stream.read(1)
             if tok == b_("]"):
                 break
-            stream.seek(-1, 1)
+            stream.seek(-1, 1)  #restored  cj2019 as it stops error
             # read and append obj
             arr.append(readObject(stream, pdf))
         return arr
@@ -638,8 +638,8 @@ class DictionaryObject(dict, PdfObject):
         #deal with the dict portion
         while True:      
             tok = readNonWhitespace(stream)
-            # line below should perhaps read >>> if tok is None 
-            if not tok:  
+            # cj2019 line below read if not tok
+            if tok is None :  
                 # stream has truncated prematurely
                 raise PdfStreamError("Stream has ended unexpectedly in dict")
             if tok == b_(">"):
@@ -657,6 +657,8 @@ class DictionaryObject(dict, PdfObject):
             tok = readNonWhitespace(stream)
             stream.seek(-1, 1)
             value = readObject(stream, pdf)
+            #import pdb
+            #pdb.set_trace()
             if not data.get(key):
                 data[key] = value
             elif pdf.strict:
