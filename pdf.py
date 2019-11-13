@@ -1755,17 +1755,42 @@ class PdfFileReader(object):
         return obj
 
     def read(self, stream):
+    
+    
+    
         debug = False
-        if debug: print(">>read", stream)
-        # start at the end:
+        if debug: 
+            print(">>read", stream)
+            
+        # check file header 
+        
+        stream.seek( 0 ,0 ) 
+        
+        line = stream.read(4) 
+        if line != b_("%PDF"):
+            raise utils.PdfReadError(f'File does not start with %%PDF but with {line} ')
+        
+        # table of components is at the end if the file:
         stream.seek(-1, 2)
         if not stream.tell():
             raise utils.PdfReadError('Cannot read an empty file')
-        last1K = stream.tell() - 1024 + 1 # offset of last 1024 bytes of stream
+            
+        # according to implementation details of pdf 1.4 specification the eof
+        # needs to be in the last 1024 bytes of the file  
+        
+        last1K = stream.tell() - 1024 + 1 
+        print( f" stream size {stream.tell()}   eof expected before {last1K} " )    
         line = b_('')
         while line[:5] != b_("%%EOF"):
-            if stream.tell() < last1K:
-                raise utils.PdfReadError("EOF marker not found")
+            print( f' searching for EOF at {stream.tell()} ' ) 
+            if stream.tell() < last1K:  
+                print( "EOF marker not in last 1k of file" )
+                ll = len(line) 
+                ls = min( ll , 10 ) 
+                le = max( 0 , ll - 10 ) 
+                #print( "Line  {}...{} len{}".format( line[:ls] , line[le:] , ll   ) )
+            #    raise utils.PdfReadError("EOF marker not found")
+            
             line = self.readNextEndLine(stream)
             if debug: print("  line:",line)
 
