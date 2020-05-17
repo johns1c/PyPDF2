@@ -30,6 +30,22 @@
 
 """
 Implementation of generic PDF objects (dictionary, number, string, and so on)
+
+
+postscript objects are one of the following types
+
+integer          sign, digits (also radix notation )
+real             allow exponent and decimal point             , 
+boolean          'true' or 'false' 
+array, packed array   [ ... ] 
+string             (... ) also hex <...> and 
+name              a word - perhaps with / 
+dictionary        <<  >> 
+operator          just another word
+mark              stores a position on the operand stack
+null              'null' 
+
+
 """
 __author__ = "Mathieu Fenniak"
 __author_email__ = "biziqe@mathieu.fenniak.net"
@@ -48,6 +64,8 @@ import sys
 debug = False
 
 ObjectPrefix = b_('/<[tf(n%')
+
+
 NumberSigns = b_('+-')
 NumberChars = b_('+-.0123456789' )
 IndirectPattern = re.compile(b_(r"(\d+)\s+(\d+)\s+R[^a-zA-Z]"))
@@ -66,45 +84,40 @@ def readWord(stream):
     return result
 
 def readObject(stream, pdf):
+    # do a look ahead - reading 10 bytes and returning from whence we came
+    # the individual routines will then interpret the stream from the current position
     here = stream.tell()
     stuff = stream.read(20)
-    if debug: print( "reading object ..." , stuff[:20] ) 
+    first_char = stuff[0] 
     stream.seek(here)
-    tok = stream.read(1)
-    stream.seek(-1, 1) # reset to start
-    idx = ObjectPrefix.find(tok)
-    if idx == 0:
-        # name object
-        return NameObject.readFromStream(stream, pdf)
-    elif idx == 1:
-        # hexadecimal string OR dictionary
-        spos = stream.tell()
-        peek = stream.read(2)
-        stream.seek(-2, 1) # reset to start
-        if peek == b_('<<'):
-            return DictionaryObject.readFromStream(stream, pdf)
-        else:
-            try:
-                return readHexStringFromStream(stream)
-            except :
-                print( "########################error reading hex stream following <<" ) 
-                stream.seek(spos)
-                stuff = stream.read(50) 
-                print(stuff)
-                raise
-    elif idx == 2:
-        # array object
-        return ArrayObject.readFromStream(stream, pdf)
-    elif idx == 3 or idx == 4:
-        # boolean object
-        return BooleanObject.readFromStream(stream)
-    elif idx == 5:
-        # string object
-        return readStringFromStream(stream)
-    elif idx == 6:
-        # null object
+
+    # name like objects true, false, null
+    if stuff[:4] == b'true' : 
+        return BooleanObject.readFromStream(stream)    
+    if stuff[:5] == b'false' :  
+        return BooleanObject.readFromStream(stream)    
+    if stuff[:4] == b'null' :    
         return NullObject.readFromStream(stream)
-    elif idx == 7:
+    if stuff[:2] == b'<<' :
+        return DictionaryObject.readFromStream(stream, pdf)
+    if stuff[:2] == b'<~' :
+        print( 'pdf stream has ascii85 encoded strings within stream' )
+        raise        
+    if stuff[:1]  == b'<' :   # old 1 
+        try:
+            return readHexStringFromStream(stream)
+        except :
+            print( "########################error reading hex stream following <<" ) 
+            stream.seek(spos)
+            stuff = stream.read(50) 
+            print(stuff)
+            raise
+    if stuff[:1]  == b'('   : # string  (xxx) old 5
+        return readStringFromStream(stream)
+    if stuff[:1]  == b'[' :   # array   [...]  old 2
+        return ArrayObject.readFromStream(stream, pdf)
+        
+    if stuff[:1]  == b'%':     # comment old 7 
         # comment
         while tok not in (b_('\r'), b_('\n')):
             tok = stream.read(1)
@@ -115,23 +128,17 @@ def readObject(stream, pdf):
         tok = readNonWhitespace(stream)
         stream.seek(-1, 1)
         return readObject(stream, pdf)
-    else:
-        # number object OR indirect reference
-        if tok in NumberSigns:
-            # number
-            return NumberObject.readFromStream(stream)
-        peek = stream.read(20)
-        stream.seek(-len(peek), 1) # reset to start
-        if IndirectPattern.match(peek) != None:
+        
+    if stuff[:1] in NumberChars :
+        if IndirectPattern.match(stuff) is not  None:
             return IndirectObject.readFromStream(stream, pdf)
-        elif tok in NumberChars:
+        else :    
             return NumberObject.readFromStream(stream)
-        elif tok in WHITESPACES:
-            while tok in WHITESPACES:
-                 tok = stream.read(1)
-        else :
-            theWord = readWord(stream) 
-            return( theWord) 
+        
+    if stuff[:1] == b'/'   :
+        return NameObject.readFromStream(stream, pdf)
+    else :
+        return readWord(stream) 
 
 class PdfObject(object):
     def getObject(self):
