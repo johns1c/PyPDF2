@@ -71,6 +71,8 @@ import codecs
 from .generic import *
 from .utils import readNonWhitespace, readUntilWhitespace, ConvertFunctionsToVirtualList
 from .utils import isString, b_, u_, ord_, chr_, str_, formatWarning
+from .utils import glyph2unicode
+from .toUnicode import * 
 
 if version_info < ( 2, 4 ):
    from sets import ImmutableSet as frozenset
@@ -1837,9 +1839,15 @@ class PdfFileReader(object):
                     readNonWhitespace(stream)
                     stream.seek(-1, 1)
                     size = readObject(stream, self)
+                    
                     readNonWhitespace(stream)
                     stream.seek(-1, 1)
                     cnt = 0
+                    try:
+                        x = cnt < size 
+                    except:
+                        print( f'{cnt=} {type(cnt)=} ' ) 
+                        print( f'{size=} {type(size)=} ' ) 
                     while cnt < size:
                         line = stream.read(20)
 
@@ -2685,9 +2693,26 @@ class PageObject(DictionaryObject):
         be refined in the future.  Do not rely on the order of text coming out of
         this function, as it will change if this function is made more
         sophisticated.
+        
+        This is a work in progress.  Translation of bytes to unicode should
+        1.  use the encoding for the font being used
+        1.a  standard font encoding using the existing routines
+        1.b  tounicode information if the font uses this
+        1.c  glyph information if the font definition supplies or amends it 
+        1.d  cid or glyph information from extenal font ??
+        1.e  some message and fallback (perhaps to user provided lookup)
+        
+        The translate functions need to be moved to a separate font
+        handler sub-module 
+        
+        Potentially thinking of having  "Basic" and "Decoded" routines adding an extractTextQuick routine
+        with the Basic routine only handling standard and unicode fonts
 
         :return: a unicode string object.
         """
+        cjdebug = False
+        word_space_limit = -0
+        print( "***************************" ) 
         text = u_("")
         content = self["/Contents"].getObject()
         if not isinstance(content, ContentStream):
@@ -2695,28 +2720,114 @@ class PageObject(DictionaryObject):
         # Note: we check all strings are TextStringObjects.  ByteStringObjects
         # are strings where the byte->string encoding was unknown, so adding
         # them to the text here would be gibberish.
+        
+        def as_text(  pdf_thing, default='' ,encoding='latin-1' , repl=None ) :
+            if cjdebug :
+                import pdb
+                pdb.set_trace()
+            if isinstance( pdf_thing, (TextStringObject)):
+                return( pdf_thing ) 
+            elif isinstance( pdf_thing, (ByteStringObject, bytes) ) and repl is not None :
+                tstr = '' 
+                for ord in pdf_thing :
+                    try:
+                        tchar = repl[ ord ]
+                        tstr  += tchar 
+                    except:
+                        import pdb
+                        pdb.set_trace() 
+                        
+                        print( f'byte has no repl {ord} ' )
+                        tstr  += '?' 
+                return tstr
+            elif isinstance( pdf_thing, (ByteStringObject, bytes) ) and repl is None :
+                return pdf_thing.decode(encoding, 'replace')
+            else :
+                return default 
+                
+        
+        repl = None         
         for operands, operator in content.operations:
-            if operator == b_("Tj"):
-                _text = operands[0]
-                if isinstance(_text, TextStringObject):
-                    text += _text
-            elif operator == b_("T*"):
+            #print( operator , operands  ) 
+            #print( '>>' , [ [type(j) for j in i ]  if isinstance(i, ArrayObject)  else  type(i)  for i in operands  ] )
+            if False:
+                pass
+            elif operator == b'Tf':
+            
+                 
+                encoding = 'latin-1' 
+                current_font_name = operands[0]
+                #text +=   f'<{operands}>' 
+                #print( f'FONT --- {current_font_name} ' )
+                if True :
+                    current_font =  self["/Resources"]['/Font'][current_font_name].getObject()
+                    current_font_subtype = current_font['/Subtype']
+                    current_font_encoding = current_font['/Encoding']
+                    current_font_to_unicode = current_font['/ToUnicode']
+                    
+                    
+                    if False :
+                        pass
+                    elif current_font_to_unicode is not None :
+                        to_unicode_stream  = current_font_to_unicode.getData() 
+                        tu = toUnicode( to_unicode_stream , current_font_name )
+                        encoding = 'font.tounicode' 
+                        
+                    elif current_font_encoding is None :
+                        print ( '>>>>>>>>>>>>>>>>>font has no encoding' ) 
+                        repl = None
+                        encoding = 'latin-1' 
+                        
+                        
+                    elif isinstance( current_font_encoding , DictionaryObject )  :   
+                        Diff = current_font_encoding['/Differences' ]
+                        entries = len(Diff) 
+                        i = 0
+                        source = 0
+                        repl = dict()
+                        while i < entries :
+                            assert isinstance( Diff[i] , NumberObject ) 
+                            source = Diff[i] + 0 
+                            i += 1
+                            while(  i < entries ) and ( isinstance( Diff[i] , NumberObject ) == False ) :
+                                char = glyph2unicode(Diff[i]) 
+                                repl[source] = char
+                                source += 1
+                                i += 1
+                                                     
+                    
+                    elif current_font_encoding in (  '/WinAnsiEncoding' )   :   
+                        repl = None
+                        encoding = 'latin-1' 
+                    elif current_font_encoding in (  '/MacRomanEncoding' )   :   
+                        repl = None
+                        encoding = 'mac_roman'
+                    else :
+                        print(   current_font_encoding ,'*'*30 ) 
+            elif operator == b"Tm":
+                 pass
+            elif operator == b"Tj":
+                text += as_text( operands[0],repl=repl) + " "
+            elif operator == b"T*":
                 text += "\n"
-            elif operator == b_("'"):
-                text += "\n"
-                _text = operands[0]
-                if isinstance(_text, TextStringObject):
-                    text += operands[0]
-            elif operator == b_('"'):
-                _text = operands[2]
-                if isinstance(_text, TextStringObject):
-                    text += "\n"
-                    text += _text
-            elif operator == b_("TJ"):
+            elif operator == b"'":
+                text += "\n" + as_text( operands[0],encoding=encoding,repl=repl) 
+            elif operator == b'"':
+                text += "\n" + as_text( operands[2],encoding=encoding,repl=repl) 
+            elif operator == b"TJ":
+            
                 for i in operands[0]:
-                    if isinstance(i, TextStringObject):
-                        text += i
+                    if isinstance(i, (TextStringObject,ByteStringObject,bytes) ):
+                        text += as_text(i,encoding=encoding,repl=repl)
+                    elif isinstance( i , (NumberObject,FloatObject)) and ( i < word_space_limit ) :
+                        text += " "
+                    elif isinstance( i , (NumberObject,FloatObject)) :
+                        pass
+                    else:
+                        print('TJ operator error' , type(i),i )
+                        
                 text += "\n"
+                
         return text
 
     mediaBox = createRectangleAccessor("/MediaBox", ())
