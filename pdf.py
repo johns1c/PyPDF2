@@ -4,6 +4,8 @@
 #
 #  allow indirect objects to replace integer and other values 
 #  using code similar to that for rotation 
+#  translate all the standard encodings properly
+#  
 
 #
 # vim: sw=4:expandtab:foldmethod=marker
@@ -2727,6 +2729,8 @@ class PageObject(DictionaryObject):
                 pdb.set_trace()
             if isinstance( pdf_thing, (TextStringObject)):
                 return( pdf_thing ) 
+            elif isinstance( pdf_thing, (ByteStringObject, bytes) ) and isinstance( encoding , toUnicode)  :
+                return  encoding.code2text( pdf_thing ) 
             elif isinstance( pdf_thing, (ByteStringObject, bytes) ) and repl is not None :
                 tstr = '' 
                 for ord in pdf_thing :
@@ -2754,9 +2758,11 @@ class PageObject(DictionaryObject):
                 pass
             elif operator == b'Tf':
             
-                 
+                print( f'TF operands   {operands} ' ) 
                 encoding = 'latin-1' 
                 current_font_name = operands[0]
+                
+                
                 #text +=   f'<{operands}>' 
                 #print( f'FONT --- {current_font_name} ' )
                 if True :
@@ -2769,9 +2775,11 @@ class PageObject(DictionaryObject):
                     if False :
                         pass
                     elif current_font_to_unicode is not None :
+                    
+                        print( f'current_font_name=' ) 
                         to_unicode_stream  = current_font_to_unicode.getData() 
-                        tu = toUnicode( to_unicode_stream , current_font_name )
-                        encoding = 'font.tounicode' 
+                        tu = toUnicode.loadSource( to_unicode_stream , current_font_name )
+                        encoding = tu  
                         
                     elif current_font_encoding is None :
                         print ( '>>>>>>>>>>>>>>>>>font has no encoding' ) 
