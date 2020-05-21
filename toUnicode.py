@@ -54,7 +54,6 @@ class toUnicode(DictionaryObject):
             if codelength is not None:
                 self.codelength=codelength
             elif codespacerange is not None:
-                print( f'{codespacerange=}' ) 
                 self.codelength = [ len(range[0]) for range in codespacerange ]
             elif baseencoding in( self.StandardEncodings ):
                 self.codelength=1
@@ -105,13 +104,16 @@ class toUnicode(DictionaryObject):
         def code2text(self,codebytes):
             def shift( res0  , offset ) :
                 patts = ( '?' ,'>B' , '>H' , '>W' , '>I' ) 
-                pat = patts[ len(res0) ]
-                print( res0 , pat ) 
-                int0 = struct.unpack( pat , res0 )[0] 
-                intx = int0 + offset 
-                byt0 = struct.pack( pat, int0)                         
-                return byt0        
-                        
+                try :
+                    pat = patts[ len(res0) ]
+                    int0 = struct.unpack( pat , res0 )[0] 
+                    intx = int0 + offset 
+                    byt0 = struct.pack( pat, int0)                         
+                    return byt0 
+                except :
+                    if isinstance( res0 , PyPDF2.generic.ArrayObject ) :
+                        return res0[offset] 
+                    
                     
             def inrange( source , rfrom , rto  , pos=0 ) :    # 
                 if source[pos] < rfrom[0] or source[pos] > rto[0] :
@@ -133,8 +135,7 @@ class toUnicode(DictionaryObject):
                 else :
                     raise
                 
-                
-            self.tell( What='All' )     
+            if debug : self.tell(What='All') 
             if len(codebytes)%self.codelength[0] == 0 :
                 pass # as expected
             else :
@@ -180,8 +181,6 @@ class toUnicode(DictionaryObject):
                    i += 1 
                 
             text = utf16_result.decode( 'UTF-16BE' ) 
-            print( f'{utf16_result}' ) 
-            print( f'{text=}' ) 
             return text
             
             
@@ -189,7 +188,7 @@ class toUnicode(DictionaryObject):
 #--------------------------------------------------------------            
         def loadSource( source , id , pdf=None , Debug=True ):
             my_object_number = -999
-            print( 'loadSource '*5 ) 
+            if debug : print( 'loadSource '*5 ) 
             if TRACE :
                 import pdb
                 pdb.set_trace()
@@ -205,6 +204,7 @@ class toUnicode(DictionaryObject):
             codespaceranges = list() 
             dictionary_stack = list() 
             currentdict = dict() 
+            
             
             def  readCommand( source ) :
                 command_operands = [] 
@@ -224,7 +224,6 @@ class toUnicode(DictionaryObject):
                     token=readObject(source,pdf)       
                     
                 command_operator = token
-                #print( f'>>> CMD >>> {command_operator} {command_operands}' ) 
                 return ( command_operator , command_operands)
                 
             
@@ -243,7 +242,6 @@ class toUnicode(DictionaryObject):
             def do_begincodespacerange(operator, operand ) :
                 nonlocal my_object_number
                 my_object_number = operand.pop()  
-                print( f'begin code range   {my_object_number} ' )
                 
             def do_endcodespacerange(operator, operand ) :
                 # from and to ranges  1,2 or 3 byte limits - 
@@ -252,31 +250,25 @@ class toUnicode(DictionaryObject):
                 nonlocal my_object_number 
                 codespaceranges = [ (operand[i],operand[i+1]) for i in range( 0 , len(operand) , 2 ) ]
                 my_object_number
-                print( f'end code range {my_object_number}  ' )
-                for csrange in codespaceranges:
-                    print(  csrange )
+                operand.clear()
+                if debug : print( 'handled endcodespacerange' )
                 
             def do_beginbfrange(operator, operand ) :
                 nonlocal my_object_number
                 my_object_number = operand.pop()  
 
-                print( 'begin frange ' )
             def do_endbfrange(operator, operand ) :
                 nonlocal franges
-                print( 'begin frange ' )
                 this_set = [ ( operand[i], operand[i+1] , operand[i+2] ) for i in range( 0,len(operand) , 3 ) ]
                 franges.extend( this_set ) 
             
             def do_beginbfchar(operator, operand ) :
                 nonlocal my_object_number
                 my_object_number = operand.pop()  
-
-                print( 'begin fchar ' )
                 
             def do_endbfchar(operator, operand ) :
                 nonlocal fchars
                 
-                print( 'end bfchar ' )
                 for i in range(0, len(operand) , 2) :
                     fchars[ operand[i] ] = operand[i+1] 
             
@@ -308,9 +300,9 @@ class toUnicode(DictionaryObject):
                 
                 ( command , parms ) = readCommand(source) ;
                 
-                print( f'================= {command}       {parms} ' ,flush=True )             
+                if debug : print( f'================= {command}       {parms} ' ,flush=True )             
                 if command == b'findresource' :
-                    print( 'find resource ignored' )
+                    if debug : print( 'find resource ignored' )
                 elif command == b'begin' :
                     do_begin( command , parms ) 
                 elif command == b'def' :
@@ -330,160 +322,18 @@ class toUnicode(DictionaryObject):
                 elif command == b'endbfchar' :
                     do_endbfchar( command , parms )
                 elif True :
-                    print( "command not understood" )                  
-                
+                    print( f"command {command} not understood" )                  
                 skipWhitespace(source)
                 pos = source.tell() 
-            print('returning with current dictionary ' )
-            print (currentdict )
-            print(f'{codespaceranges=}' )
+            if debug : print('returning with current dictionary ' )
+            if debug : print (currentdict )
+            if debug : print(f'{codespaceranges=}' )
+            
+            
             return     toUnicode(id, loaded=True, franges=franges ,fchars = fchars , ROS=currentdict, 
                           codespacerange=codespaceranges )
            
 
-        def loadSource_old ( source , id , pdf=None , Debug=False): 
-            # source is a bytestring (will also allow stream)
-            # store any included mappings 
-            # store the character mappings (single or range)
-            ErrorMessage = "ToUnicode parse error found {} expecting {} "      
-            if Debug: print( "Loading ToUnicode xlate table"  )
-            franges = []
-            fchars  = dict() 
-            if Debug: print( source) 
-            if isinstance( source,   io.BytesIO ) :
-                pass # as its what we expect
-                source_pos = source.tell()
-            elif isinstance( source , bytes ):
-                # streamify it
-                source = io.BytesIO(source)
-            else:
-                msg = "ToUnicode data is {} not bytes or bytestream ????".format( type( source)) 
-                utils.PdfReadError(msg) 
-                 
-            n1 =readObject(source,pdf)       # name  /CIDInit
-            skipWhitespace(source)
-            n2 =readObject(source,pdf)       # name  /ProcSet
-            skipWhitespace(source)
-            tok =readWord(source)       # postscript command findresource
-            skipWhitespace(source)
-            tok = readWord(source)      # begin 
-            skipWhitespace(source)      #########################################
-            tok = readObject(source,pdf) # 12
-            skipWhitespace(source)
-            tok = readWord(source)      # dict 
-            skipWhitespace(source)
-            tok = readWord(source)      # begin 
-            skipWhitespace(source)      ########################################
-            tok = readWord(source)      # begincmap 
-            assert (tok == b'begincmap'),ErrorMessage.format( tok, 'begincmap')
-            skipWhitespace(source)
-            tok = readObject(source,pdf) # /CIDSystemInfo 
-            cids = [b'CIDSystemInfo' , '/CIDSystemInfo']
-            assert (tok in cids),ErrorMessage.format( tok, 'CIDSystemInfo')
-                                               
-            skipWhitespace(source)
-            ROS = readObject(source,pdf)  # << ROS >> 
-            skipWhitespace(source)
-            if False:
-                    pos = source.tell()
-                    pcs = source.getvalue()[pos:pos+10]
-                    if Debug: print( pcs) 
-            tok = readWord(source)      # def
-            assert (tok == b'def'),ErrorMessage.format( tok, 'def')
-            skipWhitespace(source)      ########################################
-            o1 = readObject(source,pdf)      # /CMapName 
-            skipWhitespace(source)
-            o2 = readObject(source,pdf)      # /cmap or
-            if Debug: print( "CMapName " , o2 )
-            skipWhitespace(source)
-            cmd = readWord(source)            # def
-            assert (cmd == b'def'),ErrorMessage.format( cmd, 'def of CmapName')
-
-            skipWhitespace(source)    ###########################################
-            o1 = readObject(source,pdf)      # /CMapType 
-            skipWhitespace(source)
-            o2 = readObject(source,pdf)      # 2 
-            if Debug: print ( "CMapType " , o2 ) 
-            skipWhitespace(source)
-            cmd = readWord(source)           # def
-            assert (cmd == b'def'),ErrorMessage.format( cmd, 'def of CmapType')
-
-            skipWhitespace(source)    ###########################################
-            cmd = readWord(source)           # def
-            assert (tok == b'def'),ErrorMessage.format( tok, 'def')
-            skipWhitespace(source)    ###########################################
-            cmd = readWord(source)           # begincodespacerange
-            assert( cmd == b"begincodespacerange" ) 
-
-            skipWhitespace(source)    ###########################################
-            if cmd == b'begincodespacerange' :
-            
-                #  code ranges 
-                codespacerange = [b'',b'']
-                codespacerange[0] = readObject(source,pdf)
-                skipWhitespace(source)
-                codespacerange[1] = readObject(source,pdf)
-                skipWhitespace(source)
-                cmd = readWord(source)           # endcodespacerange
-                assert (cmd == b'endcodespacerange'),ErrorMessage.format( cmd, 'endcodespacerange')
-                skipWhitespace(source)    ###########################################
-                
-                
-                cmd = source.readline()           # next begin or end
-                skipWhitespace(source)    ###########################################
-            if  cmd.find( b'beginbfchar') > 0 : 
-                if Debug: print("beginbfchar seen" )
-                skipWhitespace(source)    ###########################################
-                while True :
-                    pos = source.tell()
-                    pcs = source.getvalue()[pos:pos+9]
-                    if pcs == b'endbfchar' : break
-                    pcs = source.getvalue()[pos:pos+20]
-                    #print( "== char at position {} ==>{}".format( pos, pcs ) )
-                    fchar = [b'',b'']
-                    fchar_from = readObject(source,pdf)
-                    skipWhitespace(source)
-                    fchar_to = readObject(source,pdf)
-                    fchars[fchar_from]=fchar_to
-                    skipWhitespace(source)
-                if Debug: print( 'fchars ended')  
-            if  cmd.find( b'beginbfrange') >= 0  :
-                #print("beginbfrange seen" )
-                franges = []
-                skipWhitespace(source)    ###########################################
-                while True :
-                    pos = source.tell()
-                    pcs = source.getvalue()[pos:pos+10]
-                    if pcs == b'endbfrange' : break
-                    pcs = source.getvalue()[pos:pos+20]
-                    #print( "== range at position {} ==>{}".format( pos, pcs ) )
-                    frange = [b'',b'', b'']
-                    frange[0] = readObject(source,pdf)
-                    skipWhitespace(source)
-                    frange[1] = readObject(source,pdf)
-                    skipWhitespace(source)
-                    frange[2] = readObject(source,pdf)
-                    franges.append(frange)
-                    skipWhitespace(source)
-                cmd = readWord(source)
-                #print( cmd)
-                skipWhitespace(source)    ###########################################
-                cmd = source.readline()
-                #print(cmd)
-                skipWhitespace(source) 
-                cmd = source.readline()
-                #print(cmd)
-                skipWhitespace(source) 
-                cmd = source.readline()
-                #print(cmd)
-                cmd = source.readline()
-                #print(cmd)
-                cmd = source.readline()
-                #print(cmd)
-            skipWhitespace(source)
-            return     toUnicode(id, loaded=True, franges=franges ,fchars = fchars , ROS=ROS, 
-                          codespacerange=codespacerange )
-            
         loadSource = staticmethod(loadSource)
         
         def getAGLFB():
