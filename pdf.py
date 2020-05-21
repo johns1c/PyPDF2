@@ -2713,7 +2713,7 @@ class PageObject(DictionaryObject):
         :return: a unicode string object.
         """
         cjdebug = False
-        word_space_limit = -0
+        word_space_limit = -80
         print( "***************************" ) 
         text = u_("")
         content = self["/Contents"].getObject()
@@ -2758,7 +2758,7 @@ class PageObject(DictionaryObject):
                 pass
             elif operator == b'Tf':
             
-                print( f'TF operands   {operands} ' ) 
+                if debug : print( f'TF operands   {operands} ' ) 
                 encoding = 'latin-1' 
                 current_font_name = operands[0]
                 
@@ -2811,11 +2811,11 @@ class PageObject(DictionaryObject):
                         repl = None
                         encoding = 'mac_roman'
                     else :
-                        print(   current_font_encoding ,'*'*30 ) 
+                        if debug : print(   current_font_encoding ,'*?'*20 ) 
             elif operator == b"Tm":
                  pass
             elif operator == b"Tj":
-                text += as_text( operands[0],repl=repl) + " "
+                text += as_text( operands[0],encoding=encoding,repl=repl) 
             elif operator == b"T*":
                 text += "\n"
             elif operator == b"'":
