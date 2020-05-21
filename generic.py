@@ -70,13 +70,14 @@ NumberSigns = b_('+-')
 NumberChars = b_('+-.0123456789' )
 IndirectPattern = re.compile(b_(r"(\d+)\s+(\d+)\s+R[^a-zA-Z]"))
 WHITESPACES =  [b' ', b'\n', b'\r', b'\t', b'\x00', b'']  # or end of string
+SEPS = [ b'<' , b'[' ]
 
 
 def readWord(stream):
     result = b''
     curr_pos = stream.tell()
     tok = stream.read(1)
-    while tok not in WHITESPACES :
+    while tok not in WHITESPACES and tok not in SEPS :
         result += tok  #appalingly slow
         curr_pos = stream.tell()
         tok = stream.read(1)
@@ -138,6 +139,7 @@ def readObject(stream, pdf):
     if stuff[:1] == b'/'   :
         return NameObject.readFromStream(stream, pdf)
     else :
+        
         return readWord(stream) 
 
 class PdfObject(object):
