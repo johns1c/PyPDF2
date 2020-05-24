@@ -225,20 +225,39 @@ class toUnicode(DictionaryObject):
                     
                 command_operator = token
                 return ( command_operator , command_operands)
-                
             
             def  do_nothing( operator , operand    ) :
                 pass
+                
             def  do_begin( operator , operand    ) :
-                currentdict.clear() 
+                 
+                currentdict.clear() # actually should not do this but use the current dict e.g. as got by find resource
+                dictionary_stack.append( currentdict )                 
+               
+            def  do_end( operator , operand    ) :
+                 
+                currentdict.clear() # actually should not do this but use the current dict e.g. as got by find resource
                 dictionary_stack.append( currentdict )                 
                
             def  do_def( operator , operand    ) :
                 try:
                     currentdict[ operand[0] ]  = operand[1]  
-                except :
+                except  :
                     print( f'issue with {operator=} {operand=} ' ) 
                     
+            def  do_dict( operator , operand    ) :
+                """creates an empty dictionary with an initial capacity of int elements and 
+                pushes the created dictionary object on the operand stack. int is expected 
+                to be a nonnegative integer. The dictionary is allocated in local or global VM
+                according to the VM allocation mode.
+                """                
+                try:
+                    size = operand.pop() 
+                    empty_dict = DictionaryObject() 
+                    operand.append(empty_dict)                     
+                except :
+                    print( f'issue with {operator=} {operand=} ' ) 
+           
             def do_begincodespacerange(operator, operand ) :
                 nonlocal my_object_number
                 my_object_number = operand.pop()  
