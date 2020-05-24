@@ -1690,6 +1690,7 @@ class PdfFileReader(object):
             if not self._override_encryption and self.isEncrypted:
                 # if we don't have the encryption key:
                 if not hasattr(self, '_decryption_key'):
+                    print(("looking at:", indirectReference.idnum, indirectReference.generation))
                     raise utils.PdfReadError("file has not been decrypted")
                 # otherwise, decrypt here...
                 import struct
