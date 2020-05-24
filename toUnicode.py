@@ -108,8 +108,8 @@ class toUnicode(DictionaryObject):
                     pat = patts[ len(res0) ]
                     int0 = struct.unpack( pat , res0 )[0] 
                     intx = int0 + offset 
-                    byt0 = struct.pack( pat, int0)                         
-                    return byt0 
+                    bytx = struct.pack( pat, intx)                         
+                    return bytx 
                 except :
                     if isinstance( res0 , PyPDF2.generic.ArrayObject ) :
                         return res0[offset] 
