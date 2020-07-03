@@ -38,8 +38,10 @@ from .utils import PdfReadError, ord_, chr_
 from sys import version_info
 if version_info < ( 3, 0 ):
     from cStringIO import StringIO
+
 else:
     from io import StringIO
+    from io import BytesIO 
     import struct
 
 try:
@@ -105,29 +107,36 @@ except ImportError:
         ms.Close()
         return retval
 
-
 class FlateDecode(object):
+    """ zipped object with optional png pre-compression """
     def decode(data, decodeParms):
         data = decompress(data)
-        predictor = 1
+        
         if decodeParms:
             try:
                 predictor = decodeParms.get("/Predictor", 1)
             except AttributeError:
-                pass    # usually an array with a null object was read
+                predictor = 1 # no predictor - usually an array with a null object was read
 
-        # predictor 1 == no predictor
         if predictor != 1:
-            columns = decodeParms["/Columns"]
-            # PNG prediction:
+           # PNG prediction:
             if predictor >= 10 and predictor <= 15:
-                output = StringIO()
-                # PNG prediction can vary from row to row
-                rowlength = columns + 1
-                assert len(data) % rowlength == 0
-                prev_rowdata = (0,) * rowlength
+                # PNG prediction can vary from row to row.  each row starts with a one byte indicator
+                # assertion previosly just added one to the number of pels 
+                #if bpc // 8 != 0 :
+                columns = decodeParms.get("/Columns")
+                bpc = decodeParms.get("/BitsPerComponent")
+                colors = decodeParms.get("/Colors")
+                rowlength = int( bpc * colors * columns  / 8 ) + 1
+                
+                assert len(data) % rowlength == 0   
+                
+                output = BytesIO()
+                prev_rowdata = bytes(rowlength) 
                 for row in range(len(data) // rowlength):
-                    rowdata = [ord_(x) for x in data[(row*rowlength):((row+1)*rowlength)]]
+                
+                    rowdata = data[(row*rowlength):((row+1)*rowlength)]
+                    
                     filterByte = rowdata[0]
                     if filterByte == 0:
                         pass
@@ -153,19 +162,14 @@ class FlateDecode(object):
                         # unsupported PNG filter
                         raise PdfReadError("Unsupported PNG filter %r" % filterByte)
                     prev_rowdata = rowdata
-                    output.write(''.join([chr(x) for x in rowdata[1:]]))
+                    output.write(rowdata[1:])
+                    
                 data = output.getvalue()
             else:
                 # unsupported predictor
                 raise PdfReadError("Unsupported flatedecode predictor %r" % predictor)
         return data
     decode = staticmethod(decode)
-
-    def encode(data):
-        return compress(data)
-    encode = staticmethod(encode)
-
-
 class ASCIIHexDecode(object):
     def decode(data, decodeParms=None):
         retval = ""
@@ -187,6 +191,9 @@ class ASCIIHexDecode(object):
         return retval
     decode = staticmethod(decode)
 
+    def encode(data):
+        return compress(data)
+    encode = staticmethod(encode)
 
 class LZWDecode(object):
     """Taken from:
