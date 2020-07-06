@@ -36,6 +36,7 @@ __author_email__ = "biziqe@mathieu.fenniak.net"
 
 from .utils import PdfReadError, ord_, chr_
 from sys import version_info
+import math
 if version_info < ( 3, 0 ):
     from cStringIO import StringIO
 
@@ -111,63 +112,63 @@ class FlateDecode(object):
     """ zipped object with optional png pre-compression """
     def decode(data, decodeParms):
         data = decompress(data)
+        if decodeParms is None :
+            return data
         
-        if decodeParms:
-            try:
-                predictor = decodeParms.get("/Predictor", 1)
-            except AttributeError:
-                predictor = 1 # no predictor - usually an array with a null object was read
+        # apply additional (probably PNG based) decoding 
+        try:
+            predictor = decodeParms.get("/Predictor", 1)
+        except AttributeError:
+            predictor = 1 # no predictor - usually an array with a null object was read
 
-        if predictor != 1:
-           # PNG prediction:
-            if predictor >= 10 and predictor <= 15:
-                # PNG prediction can vary from row to row.  each row starts with a one byte indicator
-                # assertion previosly just added one to the number of pels 
-                #if bpc // 8 != 0 :
-                columns = decodeParms.get("/Columns")
-                bpc = decodeParms.get("/BitsPerComponent")
-                colors = decodeParms.get("/Colors")
-                rowlength = int( bpc * colors * columns  / 8 ) + 1
+        if predictor >= 10 and predictor <= 15:
+            # PNG prediction.  Can vary from row to row and each row starts with a one byte indicator
+            # followed by n bytes of picture elements (not necessarily one for RGB) 
+
+            columns = decodeParms.get("/Columns")
+            bpc = decodeParms.get("/BitsPerComponent")
+            colors = decodeParms.get("/Colors")
+            rowlength = int( bpc * colors * columns  / 8 ) + 1
+            
+            assert len(data) % rowlength == 0   
+            
+            output = BytesIO()
+            prev_rowdata = bytes(rowlength) 
+            for row in range(len(data) // rowlength):
+            
+                rowdata = bytearray( data[(row*rowlength):((row+1)*rowlength)] )
                 
-                assert len(data) % rowlength == 0   
+                filterByte = rowdata[0]
+                if filterByte == 0:
+                    pass
+                elif filterByte == 1:
+                    for i in range(2, rowlength):
+                        rowdata[i] = (rowdata[i] + rowdata[i-1]) % 256
+                elif filterByte == 2:
+                    for i in range(1, rowlength):
+                        rowdata[i] = (rowdata[i] + prev_rowdata[i]) % 256
+                elif filterByte == 3:
+                    for i in range(1, rowlength):
+                        left = rowdata[i-1] if i > 1 else 0
+                        floor = math.floor(left + prev_rowdata[i])/2
+                        rowdata[i] = (rowdata[i] + int(floor)) % 256
+                elif filterByte == 4:
+                    for i in range(1, rowlength):
+                        left = rowdata[i - 1] if i > 1 else 0
+                        up = prev_rowdata[i]
+                        up_left = prev_rowdata[i - 1] if i > 1 else 0
+                        paeth = paethPredictor(left, up, up_left)
+                        rowdata[i] = (rowdata[i] + paeth) % 256
+                else:
+                    # unsupported PNG filter
+                    raise PdfReadError("Unsupported PNG filter %r" % filterByte)
+                prev_rowdata = rowdata
+                output.write(rowdata[1:])
                 
-                output = BytesIO()
-                prev_rowdata = bytes(rowlength) 
-                for row in range(len(data) // rowlength):
-                
-                    rowdata = data[(row*rowlength):((row+1)*rowlength)]
-                    
-                    filterByte = rowdata[0]
-                    if filterByte == 0:
-                        pass
-                    elif filterByte == 1:
-                        for i in range(2, rowlength):
-                            rowdata[i] = (rowdata[i] + rowdata[i-1]) % 256
-                    elif filterByte == 2:
-                        for i in range(1, rowlength):
-                            rowdata[i] = (rowdata[i] + prev_rowdata[i]) % 256
-                    elif filterByte == 3:
-                        for i in range(1, rowlength):
-                            left = rowdata[i-1] if i > 1 else 0
-                            floor = math.floor(left + prev_rowdata[i])/2
-                            rowdata[i] = (rowdata[i] + int(floor)) % 256
-                    elif filterByte == 4:
-                        for i in range(1, rowlength):
-                            left = rowdata[i - 1] if i > 1 else 0
-                            up = prev_rowdata[i]
-                            up_left = prev_rowdata[i - 1] if i > 1 else 0
-                            paeth = paethPredictor(left, up, up_left)
-                            rowdata[i] = (rowdata[i] + paeth) % 256
-                    else:
-                        # unsupported PNG filter
-                        raise PdfReadError("Unsupported PNG filter %r" % filterByte)
-                    prev_rowdata = rowdata
-                    output.write(rowdata[1:])
-                    
-                data = output.getvalue()
-            else:
-                # unsupported predictor
-                raise PdfReadError("Unsupported flatedecode predictor %r" % predictor)
+            data = output.getvalue()
+        else:
+            # unsupported predictor
+            raise PdfReadError("Unsupported flatedecode predictor %r" % predictor)
         return data
     decode = staticmethod(decode)
 class ASCIIHexDecode(object):
