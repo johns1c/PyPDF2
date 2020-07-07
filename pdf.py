@@ -2746,7 +2746,7 @@ class PageObject(DictionaryObject):
                         tstr  += '?' 
                 return tstr
             elif isinstance( pdf_thing, (ByteStringObject, bytes) ) and repl is None :
-                return pdf_thing.decode(encoding, 'replace')
+                decode_builtin( pdf_thing ,  encoding )
             else :
                 return default 
                 
@@ -2803,14 +2803,12 @@ class PageObject(DictionaryObject):
                                 repl[source] = char
                                 source += 1
                                 i += 1
-                                                     
-                    
-                    elif current_font_encoding in (  '/WinAnsiEncoding' )   :   
+                    elif current_font_encoding in (  '/WinAnsiEncoding' ,  '/MacRomanEncoding' ,  '/StandardEncoding' ,'/PDFDocEncoding' )   :   
                         repl = None
-                        encoding = 'latin-1' 
-                    elif current_font_encoding in (  '/MacRomanEncoding' )   :   
+                        encoding = current_font_encoding
+                    elif current_font_encoding in ( '/Symbol' , '/Dingbat'  )   :   
                         repl = None
-                        encoding = 'mac_roman'
+                        encoding = current_font_encoding
                     else :
                         if debug : print(   current_font_encoding ,'*?'*20 ) 
             elif operator == b"Tm":
