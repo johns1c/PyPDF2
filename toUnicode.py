@@ -580,26 +580,29 @@ class toUnicode(DictionaryObject):
                 print( "xlatebytes non standard encoding {}".format(self.baseencoding) ) 
                 self.tell()
             
-def as_text(  pdf_thing, default='' ,encoding='latin-1' , repl=None ) :
+def as_text(  pdf_thing, default='' ,encoding='latin-1' ) :
     """Convert a binary or text string to a (unicode) string 
-       may use one of the adobe standard encodings, a to_unicode table or a 
-       python codec or a lookup table specified by repl .  
+       may use one of 
+            1 a to_unicode object 
+            2 a byte to character lookup table (for diffs)
+            3 the name of a known adobe encoding e.g /MacRoman 
+            4 the name of a python coded e.g. Latin-1 
        Objects that are already unicode are not changed  """
     if isinstance( pdf_thing, (TextStringObject)):
         return( pdf_thing ) 
     elif isinstance( pdf_thing, (ByteStringObject, bytes) ) and isinstance( encoding, toUnicode)  :
         return  encoding.code2text( pdf_thing ) 
-    elif isinstance( pdf_thing, (ByteStringObject, bytes) ) and repl is not None :
+    elif isinstance( pdf_thing, (ByteStringObject, bytes) ) and isinstance( encoding , dict )  :
         tstr = '' 
         for ord in pdf_thing :
             try:
-                tchar = repl[ ord ]
+                tchar = encodng[ ord ]
                 tstr  += tchar 
             except:
                 print( f'byte has no repl {ord} ' )
                 tstr  += '?' 
         return tstr
-    elif isinstance( pdf_thing, (ByteStringObject, bytes) ) and repl is None :
+    elif isinstance( pdf_thing, (ByteStringObject, bytes) )  :
         return decode_builtin( pdf_thing ,  encoding )
     else :
         return default 
