@@ -1286,14 +1286,14 @@ def encode_pdfdocencoding(unicode_string):
                     "does not exist in translation table")
     return retval
  
-def decode_builtin( byte_array ,  encoding ): 
+def decode_builtin( byte_array ,  encoding , Strict=False   ): 
  
     if 'PDFDoc' in encoding :
         decode_table = _pdfDocEncoding
     elif 'Standard' in encoding :
         decode_table  =  _standard_encoding
     elif 'WinAnsi' in encoding :
-       return byte_array.decide('cp1252')
+       return byte_array.decode('cp1252')
     elif 'MacRoman' in encoding :
         decode_table  =  _roman_encoding 
     elif 'Symbol' in encoding :
@@ -1301,16 +1301,16 @@ def decode_builtin( byte_array ,  encoding ):
     elif 'dingbat' in encoding :
         decode_table  =  _dingbat_encoding
     else :
-        return byte_array.decide( encoding)
+        return byte_array.decode( encoding)
 
     
-    retval = u_('')
+    retval = ''
     for b in byte_array:
-        c = decode_table[ord_(b)]
-        if c == u_('\u0000'):
-            raise UnicodeDecodeError("pdfdocencoding", utils.barray(b), -1, -1,
+        tc = decode_table[b]
+        if ( tc == '\u0000' ) and  Strict : 
+            raise UnicodeDecodeError( f"decoding {encoding} byte {b} ", utils.barray(b), -1, -1,
                     "does not exist in translation table")
-        retval += c
+        retval += tc
     return retval
 
 _standard_encoding =[
