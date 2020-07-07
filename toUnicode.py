@@ -580,24 +580,63 @@ class toUnicode(DictionaryObject):
                 print( "xlatebytes non standard encoding {}".format(self.baseencoding) ) 
                 self.tell()
             
+def as_text(  pdf_thing, default='' ,encoding='latin-1' , repl=None ) :
+    """Convert a binary or text string to a (unicode) string 
+       may use one of the adobe standard encodings, a to_unicode table or a 
+       python codec or a lookup table specified by repl .  
+       Objects that are already unicode are not changed  """
+    if isinstance( pdf_thing, (TextStringObject)):
+        return( pdf_thing ) 
+    elif isinstance( pdf_thing, (ByteStringObject, bytes) ) and isinstance( encoding, toUnicode)  :
+        return  encoding.code2text( pdf_thing ) 
+    elif isinstance( pdf_thing, (ByteStringObject, bytes) ) and repl is not None :
+        tstr = '' 
+        for ord in pdf_thing :
+            try:
+                tchar = repl[ ord ]
+                tstr  += tchar 
+            except:
+                print( f'byte has no repl {ord} ' )
+                tstr  += '?' 
+        return tstr
+    elif isinstance( pdf_thing, (ByteStringObject, bytes) ) and repl is None :
+        return decode_builtin( pdf_thing ,  encoding )
+    else :
+        return default 
 
-def FetchFontsExtended(currentobject, Debug=False):
+
+def FetchFontExtended(currentobject, id  , Debug=False):
             """
             Return the standard fonts in current page or form
-            plus unicode object that allows translation.
+            plus encoding object that allows translation.
             
-            now returning a dict for the base fonts names and a 
-            another for the unicode translations  cj 16 March 2016 
+            encoding is returned as a 
+                to_unicode 
+                dict giving strings for each byte 
+                string with the name of a known encoding  
+            
+            character interpretation
+              1   /ToUnicode 
+              2   /Differences in encoding object     
+              3   /Encoding
+              4   implied by /Symbol or /ZapfDingbats font
+              5   a mapping via Type3 (mixed font) font - potentially recursively
+              5   Implied by one of other 14 standard fonts i.e. Latin-1
+              6   Held within the font itself   
+
             """
             #print( "~~~~~~~~~~~~~~~~~~~toUnicode.py~~~~~~")
             pdf_fonts = {}
             pdf_fonts2u = {}
             pdf_font_subtypes = {}
             pdf_font_encodings = {}
-            ue = None
+            
             fonts = {}
             try:
-                fonts = currentobject["/Resources"].getObject()['/Font']
+                current_font =  currentobject["/Resources"]['/Font'][id].getObject()
+                current_font_subtype = current_font['/Subtype']
+                current_font_encoding = current_font['/Encoding']
+                current_font_to_unicode = current_font['/ToUnicode']
             except KeyError :
                 fonts = {}
                 print( "page has no fonts" )
@@ -605,68 +644,53 @@ def FetchFontsExtended(currentobject, Debug=False):
             except :
                 print( "unknown error retrieving fonts for page" ) 
                 return None , None # pdf_fonts, ue  
+                
+                
+            """            character interpretation
+              1   /ToUnicode 
+              2   /Differences in encoding object
+              3   /Encoding
+              4   implied by /Symbol or /ZapfDingbats font
+              5   a mapping via Type3 (mixed font) font - potentially recursively
+              6   Implied by one of other 14 standard fonts i.e. Latin-1
+              7   Held within the font itself   
+            """
 
-            if not fonts:
-                return None , None # pdf_fonts, ue  
-                
-            for key in fonts:
-                pdf_fonts[key] = fonts[key]['/BaseFont'][1:]     # remove the leading '/'
-                afont=fonts[key]
-                 
-                bf =fonts[key]['/BaseFont']
-                # character interpretation
-                #   1   /ToUnicode 
-                #   2   /Differences in encoding object
-                #   3   /Encoding
-                #   4   implied by /Symbol or /ZapfDingbats font
-                #   5   a mapping via Type3 (mixed font) font - potentially recursively
-                #   5   Implied by one of other 14 standard fonts i.e. Latin-1
-                #   6   Held within the font itself   
-                
-                pdf_font_subtypes[key] = afont['/Subtype'][1:]     # remove leading '/'
-                
-                # encoding -- may be value or object
-                
-                # /StandardEncoding     
-                # /MacRomanEncoding (latin 1 variant)
-                # /WinAnsiEncoding (latin 1 variant)
-                # /MacExpertEncoding (extended Mac Roman)
-                
-                
-                font_subtype      = afont['/Subtype']
-                font_has_unicode  = '/ToUnicode' in (afont) 
-                font_has_encoding = '/Encoding'  in (afont) 
-                
-                    
-                if font_has_unicode:   
-                    if Debug: print (key , "+=+=+ Using /ToUnicode" )
-                    uc = afont['/ToUnicode'].getObject()
-                    ud = PyPDF2.filters.decompress(uc._data)
-                    us = io.BytesIO(ud)
-                    ue = toUnicode.loadSource(ud,key) 
-                    pdf_fonts2u[key] = ue
-                elif font_has_encoding:
-                    if Debug: print( key ,"+=+=+ Using encoding" )
-                    uc = afont['/Encoding'].getObject()
-                    pdf_fonts2u[key] = toUnicode.loadEncoding(uc , key) 
-                elif fonts[key]['/BaseFont']in ( "/Symbol" , "/ZapfDingbats"):
-                    # Adobe Symbol and ZapfDingbats has its own encoding
-                    # we treat the font name as the name of the encoding
-                    if Debug: print( key , "+=+=+ Symbol or Zapf unicode encoding" ) 
-                    pdf_fonts2u[key] = toUnicode.loadEncoding(fonts[key]['/BaseFont'], key) 
-                elif font_subtype in ( '/Type3' ):
-                    if Debug: print(key , "+=+=+ /Type3 fonts not handled yet")
-                    uc = None
-                    pdf_fonts2u[key] = None                     
-                else:
-                    if Debug: print(key, "+=+=+ unable to obtain font encoding +=")
-                    # need to test for some standard fonts
-                    uc = None
-                    pdf_fonts2u[key] = None      
-                    
-            return pdf_fonts, pdf_fonts2u
-    
+            if False :
+                pass
+            elif current_font_to_unicode is not None :  #1
             
+                to_unicode_stream  = current_font_to_unicode.getData() 
+                tu = toUnicode.loadSource( to_unicode_stream , current_font_name )
+                encoding = tu  
                 
-    
-    
+            elif isinstance( current_font_encoding , DictionaryObject )  :   #2
+            
+                Diff = current_font_encoding['/Differences' ]
+                entries = len(Diff) 
+                i = 0
+                source = 0
+                repl = dict()
+                while i < entries :
+                    assert isinstance( Diff[i] , NumberObject ) 
+                    source = Diff[i] + 0 
+                    i += 1
+                    while(  i < entries ) and ( isinstance( Diff[i] , NumberObject ) == False ) :
+                        char = glyph2unicode(Diff[i]) 
+                        repl[source] = char
+                        source += 1
+                        i += 1
+                encoding = repl 
+            elif current_font_encoding in (  '/WinAnsiEncoding' ,  '/MacRomanEncoding' ,  '/StandardEncoding' ,'/PDFDocEncoding' )   :   #3
+                encoding = current_font_encoding
+                
+            elif current_font['/BaseFont']in ( "/Symbol" , "/ZapfDingbats"):  #4
+                encoding = current_font['/BaseFont']
+                
+            elif font_subtype in ( '/Type3' ): #5 
+                if Debug: print(key , "+=+=+ /Type3 fonts not handled yet")
+                encoding = None                     
+            else:
+                if Debug: print(key, "+=+=+ unable to obtain font encoding +=")
+                # need to test for some standard fonts
+            return   current_font, encoding
