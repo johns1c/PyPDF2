@@ -2,6 +2,8 @@ import io
 import PyPDF2
 from PyPDF2.generic import *
 from PyPDF2.filters import *
+from PyPDF2.utils import glyph2unicode 
+
 import urllib.request
 import unicodedata
 TRACE = False
@@ -599,7 +601,7 @@ def as_text(  pdf_thing, default='' ,encoding='latin-1' ) :
                 tchar = encodng[ ord ]
                 tstr  += tchar 
             except:
-                print( f'byte has no repl {ord} ' )
+                #print( f'byte has no repl {ord} ' )
                 tstr  += '?' 
         return tstr
     elif isinstance( pdf_thing, (ByteStringObject, bytes) )  :

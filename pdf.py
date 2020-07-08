@@ -2724,32 +2724,6 @@ class PageObject(DictionaryObject):
         # are strings where the byte->string encoding was unknown, so adding
         # them to the text here would be gibberish.
         
-        def as_text(  pdf_thing, default='' ,encoding='latin-1' , repl=None ) :
-            if cjdebug :
-                import pdb
-                pdb.set_trace()
-            if isinstance( pdf_thing, (TextStringObject)):
-                return( pdf_thing ) 
-            elif isinstance( pdf_thing, (ByteStringObject, bytes) ) and isinstance( encoding , toUnicode)  :
-                return  encoding.code2text( pdf_thing ) 
-            elif isinstance( pdf_thing, (ByteStringObject, bytes) ) and repl is not None :
-                tstr = '' 
-                for ord in pdf_thing :
-                    try:
-                        tchar = repl[ ord ]
-                        tstr  += tchar 
-                    except:
-                        import pdb
-                        pdb.set_trace() 
-                        
-                        print( f'byte has no repl {ord} ' )
-                        tstr  += '?' 
-                return tstr
-            elif isinstance( pdf_thing, (ByteStringObject, bytes) ) and repl is None :
-                decode_builtin( pdf_thing ,  encoding )
-            else :
-                return default 
-                
         
         repl = None         
         for operands, operator in content.operations:
@@ -2760,72 +2734,26 @@ class PageObject(DictionaryObject):
             elif operator == b'Tf':
             
                 if debug : print( f'TF operands   {operands} ' ) 
-                encoding = 'latin-1' 
                 current_font_name = operands[0]
-                
-                
-                #text +=   f'<{operands}>' 
-                #print( f'FONT --- {current_font_name} ' )
-                if True :
-                    current_font =  self["/Resources"]['/Font'][current_font_name].getObject()
-                    current_font_subtype = current_font['/Subtype']
-                    current_font_encoding = current_font['/Encoding']
-                    current_font_to_unicode = current_font['/ToUnicode']
-                    
-                    
-                    if False :
-                        pass
-                    elif current_font_to_unicode is not None :
-                    
-                        print( f'current_font_name=' ) 
-                        to_unicode_stream  = current_font_to_unicode.getData() 
-                        tu = toUnicode.loadSource( to_unicode_stream , current_font_name )
-                        encoding = tu  
-                        
-                    elif current_font_encoding is None :
-                        print ( '>>>>>>>>>>>>>>>>>font has no encoding' ) 
-                        repl = None
-                        encoding = 'latin-1' 
-                        
-                        
-                    elif isinstance( current_font_encoding , DictionaryObject )  :   
-                        Diff = current_font_encoding['/Differences' ]
-                        entries = len(Diff) 
-                        i = 0
-                        source = 0
-                        repl = dict()
-                        while i < entries :
-                            assert isinstance( Diff[i] , NumberObject ) 
-                            source = Diff[i] + 0 
-                            i += 1
-                            while(  i < entries ) and ( isinstance( Diff[i] , NumberObject ) == False ) :
-                                char = glyph2unicode(Diff[i]) 
-                                repl[source] = char
-                                source += 1
-                                i += 1
-                    elif current_font_encoding in (  '/WinAnsiEncoding' ,  '/MacRomanEncoding' ,  '/StandardEncoding' ,'/PDFDocEncoding' )   :   
-                        repl = None
-                        encoding = current_font_encoding
-                    elif current_font_encoding in ( '/Symbol' , '/Dingbat'  )   :   
-                        repl = None
-                        encoding = current_font_encoding
-                    else :
-                        if debug : print(   current_font_encoding ,'*?'*20 ) 
+                current_font, current_font_encoding = FetchFontExtended(self , current_font_name , Debug=False)
+                if current_font_encoding is None :
+                    current_font_encoding
             elif operator == b"Tm":
                  pass
             elif operator == b"Tj":
-                text += as_text( operands[0],encoding=encoding,repl=repl) 
+                nt = as_text( operands[0],encoding=current_font_encoding) 
+                text += nt
             elif operator == b"T*":
                 text += "\n"
             elif operator == b"'":
-                text += "\n" + as_text( operands[0],encoding=encoding,repl=repl) 
+                text += "\n" + as_text( operands[0],encoding=current_font_encoding) 
             elif operator == b'"':
-                text += "\n" + as_text( operands[2],encoding=encoding,repl=repl) 
+                text += "\n" + as_text( operands[2],encoding=current_font_encoding) 
             elif operator == b"TJ":
             
                 for i in operands[0]:
                     if isinstance(i, (TextStringObject,ByteStringObject,bytes) ):
-                        text += as_text(i,encoding=encoding,repl=repl)
+                        text += as_text(i,encoding=current_font_encoding)
                     elif isinstance( i , (NumberObject,FloatObject)) and ( i < word_space_limit ) :
                         text += " "
                     elif isinstance( i , (NumberObject,FloatObject)) :

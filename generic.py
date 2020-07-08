@@ -1293,15 +1293,16 @@ def decode_builtin( byte_array ,  encoding , Strict=False   ):
     elif 'Standard' in encoding :
         decode_table  =  _standard_encoding
     elif 'WinAnsi' in encoding :
-       return byte_array.decode('cp1252')
+       return byte_array.decode('cp1252', errors='replace' )
     elif 'MacRoman' in encoding :
         decode_table  =  _roman_encoding 
     elif 'Symbol' in encoding :
         decode_table  =  _symbol_encoding
-    elif 'dingbat' in encoding :
+    elif 'ingbat' in encoding :
         decode_table  =  _dingbat_encoding
     else :
-        return byte_array.decode( encoding)
+        print( f"encoding=" ) 
+        return byte_array.decode( encoding, errors='replace' )
 
     
     retval = ''
