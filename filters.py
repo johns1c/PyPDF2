@@ -128,7 +128,12 @@ class FlateDecode(object):
             columns = decodeParms.get("/Columns")
             bpc = decodeParms.get("/BitsPerComponent")
             colors = decodeParms.get("/Colors")
-            rowlength = int( bpc * colors * columns  / 8 ) + 1
+            try:
+                rowlength = int( bpc * colors * columns  / 8 ) + 1 if bpc is not None else columns + 1
+            except:
+                print ( 'error in decode parms handling ' ) 
+                import pdb
+                pdb.set_trace()
             
             assert len(data) % rowlength == 0   
             
