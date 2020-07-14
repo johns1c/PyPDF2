@@ -9,7 +9,7 @@ import unicodedata
 TRACE = False
 class toUnicode(DictionaryObject):
         def __init__( self, id, codespacerange=None, codelength=None, loaded=None, 
-                    fchars=None, franges=None, ROS=None , baseencoding = None , diffs=None  ,Debug=False):
+                    fchars=None, franges=None, ROS=None , baseencoding = None , diffs=None  ,debug=False):
             ErrorMessage = "ToUnicode parse error found {} expecting {} "     
             self.StandardCodecs = [ "/StandardEncoding" , 
                                   "/MacRomanEncoding" , 
@@ -45,11 +45,11 @@ class toUnicode(DictionaryObject):
             self.baseencoding = baseencoding
             self.codespacerange=codespacerange
             if diffs is not None:
-                if Debug: print ( "we have /Differences" ) 
+                if debug: print ( "we have /Differences" ) 
                 self.diffs=diffs
                 self.ucodes = toUnicode.checkDiffs(self.diffs)
             else:
-                if Debug: print ( "we have no /Differences " ) 
+                if debug: print ( "we have no /Differences " ) 
                 self.diffs=None
             #if codespacerange:
             #    self.codespacerange=codespacerange
@@ -136,13 +136,14 @@ class toUnicode(DictionaryObject):
                     return True
                 else :
                     raise
-                
-            if debug : self.tell(What='All') 
-            if len(codebytes)%self.codelength[0] == 0 :
-                pass # as expected
-            else :
-                print( f'code2text fed with odd length source {len(codebytes)} for {self.codelength=} ' ) 
-                self.tell(What='All') 
+             
+            if False :              
+                if debug : self.tell(What='All') 
+                if len(codebytes)%self.codelength[0] == 0 :
+                    pass # as expected
+                else :
+                    print( f'code2text fed with odd length source {len(codebytes)} for {self.codelength=} ' ) 
+                    if debug: self.tell(What='All') 
                 
             BFROM = 0
             BTO   = 1
@@ -188,7 +189,7 @@ class toUnicode(DictionaryObject):
             
             
 #--------------------------------------------------------------            
-        def loadSource( source , id , pdf=None , Debug=True ):
+        def loadSource( source , id , pdf=None , debug=False ):
             my_object_number = -999
             if debug : print( 'loadSource '*5 ) 
             if TRACE :
@@ -298,7 +299,7 @@ class toUnicode(DictionaryObject):
                 
                 
             
-            if Debug: print( source) 
+            if debug: print( source) 
             if isinstance( source,   io.BytesIO ) :
                 pass # as its what we expect
                 source_pos = source.tell()
@@ -309,7 +310,6 @@ class toUnicode(DictionaryObject):
                 msg = "ToUnicode data is {} not bytes or bytestream ????".format( type( source)) 
                 utils.PdfReadError(msg) 
             
-            Debug = True 
             last_pos = -1 
             pos = source.tell() 
             
@@ -321,7 +321,7 @@ class toUnicode(DictionaryObject):
                 
                 ( command , parms ) = readCommand(source) ;
                 
-                if debug : print( f'================= {command}       {parms} ' ,flush=True )             
+                if debug : print( f'====x============= {command}       {parms} ' ,flush=True )             
                 if command == b'findresource' :
                     if debug : print( 'find resource ignored' )
                 elif command == b'begin' :
@@ -343,7 +343,7 @@ class toUnicode(DictionaryObject):
                 elif command == b'endbfchar' :
                     do_endbfchar( command , parms )
                 elif True :
-                    print( f"command {command} not understood" )                  
+                    if debug : print( f"command {command} not understood" )                  
                 skipWhitespace(source)
                 pos = source.tell() 
             if debug : print('returning with current dictionary ' )
@@ -402,8 +402,8 @@ class toUnicode(DictionaryObject):
             return gdict 
 
 
-        def checkDiffs(dlist, Debug=False):
-            if Debug: print ("Loading diffs >>>>>>>>>>>>>>>>>>>>>>>>>>")
+        def checkDiffs(dlist, debug=False):
+            if debug: print ("Loading diffs >>>>>>>>>>>>>>>>>>>>>>>>>>")
             #print (dlist)
             gdict = toUnicode.getAGLFB()
             #print( gdict)
@@ -437,10 +437,10 @@ class toUnicode(DictionaryObject):
                 else:
                     unicode = None 
                 ucodes[cp] = unicode
-            if Debug: print( "Difference table {} known, {} spec notdef  {} failed ".format( info_dd , info_nd , info_zd ) )
+            if debug: print( "Difference table {} known, {} spec notdef  {} failed ".format( info_dd , info_nd , info_zd ) )
             return ucodes
 
-        def loadEncoding(  esource, id , pdf=None , Debug=False): 
+        def loadEncoding(  esource, id , pdf=None , debug=False): 
             known_encodings = [ '/Symbol' , '/ZapfDingbats' ,
                                 '/StandardEncoding' ,     
                                 '/MacRomanEncoding' , 
@@ -456,7 +456,7 @@ class toUnicode(DictionaryObject):
                      info =  " encoding is known" 
                 else :
                      info =  " encoding is NOT known" 
-                if Debug: print ( "=+=+=Loaded empty ToUnicode xlate table" , esource , info)
+                if debug: print ( "=+=+=Loaded empty ToUnicode xlate table" , esource , info)
                 return     toUnicode(id, loaded=False, franges=None , ROS=None, 
                           codespacerange=None, baseencoding = esource, diffs = None)
                           
@@ -468,20 +468,20 @@ class toUnicode(DictionaryObject):
                     note = " with differences "
                 else:
                     note = " no differences" 
-                if Debug: print ( "=+=+=Loaded empty ToUnicode xlate table" , enc , note)
+                if debug: print ( "=+=+=Loaded empty ToUnicode xlate table" , enc , note)
                 return     toUnicode(id, loaded=False, franges=None , ROS=None, 
                           codespacerange=None, baseencoding = enc, diffs=dfs )
                           
             else :
                 VarType = type(esource) 
-                if Debug: print( "=+=+=+load encoding finds type {}".format(VarType) )
+                if debug: print( "=+=+=+load encoding finds type {}".format(VarType) )
                 return     toUnicode(id, loaded=False, franges=None , ROS=None, 
                           codespacerange=None, baseencoding = esource)
         
         
         loadEncoding = staticmethod(loadEncoding)
             
-        def xlateBytes( self , bs, replace=None , Debug=False ):
+        def xlateBytes( self , bs, replace=None , debug=False ):
             # start with empty output
             # for each n (pair?) of bytes (code)  # this dont work for n byte charsets
             # if code  mapped use mapping
@@ -513,7 +513,7 @@ class toUnicode(DictionaryObject):
             if self.baseencoding in  base_codecs :
                 codec = base_codecs[ self.baseencoding ]
                 if self.diffs:                                           
-                    if Debug: print('xlatebytes has diffs - bytewise tranlation' ) 
+                    if debug: print('xlatebytes has diffs - bytewise tranlation' ) 
                     #ucodes = toUnicode.checkDiffs(self.diffs)
                     ucodes = self.ucodes  
                     cs = [Nvl( p1=ucodes[b], p2=bytes([b]).decode( "iso-8859-1"  , "replace" ), p3='?' ) for b in bs]
@@ -536,7 +536,7 @@ class toUnicode(DictionaryObject):
                 #for cp in cps:
                 #    try:   
             elif self.loaded:
-                if Debug : print( "Unicode xlate" )
+                if debug : print( "Unicode xlate" )
                 cl = self.codelength
                 cps = [bs[i:i+cl] for i in range(0,len(bs),cl)]
                 res = bytearray( b'') 
@@ -546,7 +546,7 @@ class toUnicode(DictionaryObject):
                     # 
                     if  cp in self.fchars:
                         res.extend( self.fchars[cp] )  
-                        if Debug:
+                        if debug:
                             print( "fchar table match", end="" )   
                             print( self.fchars[cp])                        
                     else :
@@ -580,7 +580,7 @@ class toUnicode(DictionaryObject):
                 return(bres)  
             else:
                 print( "xlatebytes non standard encoding {}".format(self.baseencoding) ) 
-                self.tell()
+                if debug : self.tell()
             
 def as_text(  pdf_thing, default='' ,encoding='latin-1' ) :
     """Convert a binary or text string to a (unicode) string 
@@ -631,6 +631,8 @@ def FetchFontExtended(currentobject, id  , Debug=False):
 
             """
             #print( "~~~~~~~~~~~~~~~~~~~toUnicode.py~~~~~~")
+            debug = Debug
+            
             pdf_fonts = {}
             pdf_fonts2u = {}
             pdf_font_subtypes = {}
@@ -638,6 +640,7 @@ def FetchFontExtended(currentobject, id  , Debug=False):
             
             fonts = {}
             try:
+                 
                 current_font =  currentobject["/Resources"]['/Font'][id].getObject()
                 current_font_subtype = current_font['/Subtype']
                 current_font_encoding = current_font['/Encoding']
@@ -666,7 +669,7 @@ def FetchFontExtended(currentobject, id  , Debug=False):
             elif current_font_to_unicode is not None :  #1
             
                 to_unicode_stream  = current_font_to_unicode.getData() 
-                tu = toUnicode.loadSource( to_unicode_stream , current_font_name )
+                tu = toUnicode.loadSource( to_unicode_stream , id )
                 encoding = tu  
                 
             elif isinstance( current_font_encoding , DictionaryObject )  :   #2
@@ -693,9 +696,9 @@ def FetchFontExtended(currentobject, id  , Debug=False):
                 encoding = current_font['/BaseFont']
                 
             elif font_subtype in ( '/Type3' ): #5 
-                if Debug: print(key , "+=+=+ /Type3 fonts not handled yet")
+                if debug: print(key , "+=+=+ /Type3 fonts not handled yet")
                 encoding = None                     
             else:
-                if Debug: print(key, "+=+=+ unable to obtain font encoding +=")
+                if debug: print(key, "+=+=+ unable to obtain font encoding +=")
                 # need to test for some standard fonts
             return   current_font, encoding
