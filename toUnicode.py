@@ -590,6 +590,11 @@ def as_text(  pdf_thing, default='' ,encoding='latin-1' ) :
             3 the name of a known adobe encoding e.g /MacRoman 
             4 the name of a python coded e.g. Latin-1 
        Objects that are already unicode are not changed  """
+       
+    if encoding is None :
+        print( 'as_text with Encoding of None ' ) 
+        encoding='latin-1'
+        
     if isinstance( pdf_thing, (TextStringObject)):
         return( pdf_thing ) 
     elif isinstance( pdf_thing, (ByteStringObject, bytes) ) and isinstance( encoding, toUnicode)  :
