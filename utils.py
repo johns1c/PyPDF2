@@ -300,7 +300,7 @@ def hexStr(num):
 WHITESPACES = [b_(x) for x in [' ', '\n', '\r', '\t', '\x00']]
 
 
-def glyph2unicode( obj ) :
+def glyph2unicode( obj ):
     glyph2uni = dict()
     glyph2uni[ "/A" ] = "\u0041"
     glyph2uni[ "/AE" ] = "\u00C6"
@@ -889,10 +889,10 @@ def glyph2unicode( obj ) :
     glyph2uni[ "/zero" ] = "\u0030"
     glyph2uni[ "/zeta" ] = "\u03B6"
 
-    if isinstance( obj , bytes ) :
+    if isinstance( obj, bytes ):
         obj = obj.decode_pdfdocencoding( obj )
-    try :
+    try:
         return glyph2uni[ obj ]
-    except:
+    except KeyError:
         return ''
 # end of source
