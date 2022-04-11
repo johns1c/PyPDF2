@@ -4,7 +4,7 @@ Representation and utils for ranges of PDF file pages.
 
 Copyright (c) 2014, Steve Witham <switham_github@mac-guyver.com>.
 All rights reserved. This software is available under a BSD license;
-see https://github.com/mstamy2/PyPDF2/blob/master/LICENSE
+see https://github.com/py-pdf/PyPDF2/blob/master/LICENSE
 """
 
 import re
@@ -118,6 +118,11 @@ class PageRange(object):
         Returns arguments for range().  See help(slice.indices).
         """
         return self._slice.indices(n)
+
+    def __eq__(self, other):
+        if not isinstance(other, PageRange):
+            return False
+        return self._slice == other._slice
 
 
 PAGE_RANGE_ALL = PageRange(":")  # The range of all pages.
