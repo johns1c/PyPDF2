@@ -854,7 +854,7 @@ class PdfFileWriter(object):
 
     def removeText(self, ignoreByteStringObject=False):
         """
-        Removes images from this output.
+        Removes text from this output.
 
         :param bool ignoreByteStringObject: optional parameter
             to ignore ByteString Objects.
@@ -1683,6 +1683,7 @@ class PdfFileReader(object):
                 # some other problem
                 raise utils.PdfReadError("Expected object ID (%d %d) does not match actual (%d %d)." \
                                          % (indirectReference.idnum, indirectReference.generation, idnum, generation))
+            
             assert generation == indirectReference.generation
             retval = readObject(self.stream, self)
 
@@ -1794,7 +1795,8 @@ class PdfFileReader(object):
                 ls = min( ll , 10 ) 
                 le = max( 0 , ll - 10 ) 
                 #print( "Line  {}...{} len{}".format( line[:ls] , line[le:] , ll   ) )
-            #    raise utils.PdfReadError("EOF marker not found")
+                if strict :
+                    raise utils.PdfReadError("EOF marker not found")
             
             line = self.readNextEndLine(stream)
             if debug: print("  line:",line)
@@ -2325,7 +2327,9 @@ class PageObject(DictionaryObject):
 
     def getContents(self):
         """
-        Accesses the page contents.
+        Accesses the page contents.  
+        an indirect object e.g. 23 0 r seems to 
+        incorrctly return an array of [23,0, r ]
 
         :return: the ``/Contents`` object, or ``None`` if it doesn't exist.
             ``/Contents`` is optional, as described in PDF Reference  7.7.3.3
