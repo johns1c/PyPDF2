@@ -90,10 +90,10 @@ def readWord(stream):
 
 def readObject(stream, pdf):
     """ interpret the passed pdf source bytes calling the  appropriate read routine to return the apropriate 
-        pdf object
+        pdf object creation code
         
         the routine
-         - reads ahead 20 byes
+         - reads ahead 20 bytes
          - examines the first one or more bytes which determine the object            works by examining the first few bytes
          - calls the appropriate read routine and returns the object
          - checks for comments and indirect references
@@ -121,7 +121,7 @@ def readObject(stream, pdf):
             print( "########################error reading hex stream following <<" ) 
             stream.seek(spos)
             stuff = stream.read(50) 
-            print ( stuff ) 
+            print(stuff)
             raise
     if stuff[:1]  == b'('   : # string  (xxx) old 5
         return readStringFromStream(stream)
@@ -162,12 +162,12 @@ class NullObject(PdfObject):
     def writeToStream(self, stream, encryption_key):
         stream.write(b_("null"))
 
-    @staticmethod
     def readFromStream(stream):
         nulltxt = stream.read(4)
         if nulltxt != b_("null"):
             raise PdfReadError("Could not read Null object")
         return NullObject()
+    readFromStream = staticmethod(readFromStream)
 
 
 class BooleanObject(PdfObject):
@@ -187,7 +187,6 @@ class BooleanObject(PdfObject):
         else:
             stream.write(b_("false"))
 
-    @staticmethod
     def readFromStream(stream):
         word = stream.read(4)
         if word == b_("true"):
@@ -207,7 +206,6 @@ class ArrayObject(list, PdfObject):
             data.writeToStream(stream, encryption_key)
         stream.write(b_(" ]"))
 
-    @staticmethod
     def readFromStream(stream, pdf):
         arr = ArrayObject()
         tmp = stream.read(1)
@@ -227,6 +225,8 @@ class ArrayObject(list, PdfObject):
             # read and append obj
             arr.append(readObject(stream, pdf))
         return arr
+    readFromStream = staticmethod(readFromStream)
+
 
 class IndirectObject(PdfObject):
     def __init__(self, idnum, generation, pdf):
@@ -255,7 +255,6 @@ class IndirectObject(PdfObject):
     def writeToStream(self, stream, encryption_key):
         stream.write(b_("%s %s R" % (self.idnum, self.generation)))
 
-    @staticmethod
     def readFromStream(stream, pdf):
         idnum = b_("")
         while True:
@@ -279,6 +278,7 @@ class IndirectObject(PdfObject):
         if r != b_("R"):
             raise PdfReadError("Error reading indirect object reference at byte %s" % utils.hexStr(stream.tell()))
         return IndirectObject(int(idnum), int(generation), pdf)
+    readFromStream = staticmethod(readFromStream)
 
 
 class FloatObject(decimal.Decimal, PdfObject):
@@ -323,13 +323,13 @@ class NumberObject(int, PdfObject):
     def writeToStream(self, stream, encryption_key):
         stream.write(b_(repr(self)))
 
-    @staticmethod
     def readFromStream(stream):
         num = utils.readUntilRegex(stream, NumberObject.NumberPattern)
         if num.find(NumberObject.ByteDot) != -1:
             return FloatObject(num)
         else:
             return NumberObject(num)
+    readFromStream = staticmethod(readFromStream)
 
 
 
@@ -349,8 +349,40 @@ def createStringObject(string):
         return retval
     else:
         return ByteStringObject(string)
-        
+def createStringObjectOrig(string):
+    if isinstance(string, utils.string_type):
+        return TextStringObject(string)
+    elif isinstance(string, utils.bytes_type):
+        try:
+            if string.startswith(codecs.BOM_UTF16_BE):
+                retval = TextStringObject(string.decode("utf-16"))
+                retval.autodetect_utf16 = True
+                return retval
+            else:
+                # This is probably a big performance hit here, but we need to
+                # convert string objects into the text/unicode-aware version if
+                # possible... and the only way to check if that's possible is
+                # to try.  Some strings are strings, some are just byte arrays.
+                retval = TextStringObject(decode_pdfdocencoding(string))
+                retval.autodetect_pdfdocencoding = True
+                return retval
+        except UnicodeDecodeError:
+            return ByteStringObject(string)
+    else:
+        raise TypeError("createStringObject should have str or unicode arg")
 
+def skipWhitespace(stream):
+    WHITESPACES =  [b' ', b'\n', b'\r', b'\t', b'\x00', b'%']
+    curr_pos = stream.tell()
+    tok = WHITESPACES[0]
+    while tok in WHITESPACES:
+        if tok == b'%':                # comment is whitespace
+            tok = readline( stream )
+            tok = stream.read(1) 
+        else :  
+            tok = stream.read(1)
+        curr_pos = stream.tell()
+    stream.seek(-1,1) 
 
 def readHexStringFromStream(stream):
     stream.read(1)
@@ -527,7 +559,6 @@ class NameObject(str, PdfObject):
     def writeToStream(self, stream, encryption_key):
         stream.write(b_(self))
 
-    @staticmethod
     def readFromStream(stream, pdf):
         debug = False
         if debug: print((stream.tell()))
@@ -608,7 +639,6 @@ class DictionaryObject(dict, PdfObject):
             stream.write(b_("\n"))
         stream.write(b_(">>"))
 
-    @staticmethod
     def readFromStream(stream, pdf):
         
         db_here = stream.tell()
@@ -882,7 +912,6 @@ class StreamObject(DictionaryObject):
         stream.write(data)
         stream.write(b_("\nendstream"))
 
-    @staticmethod
     def initializeFromDictionary(data):
         if "/Filter" in data:
             retval = EncodedStreamObject()
