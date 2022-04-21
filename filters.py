@@ -1,5 +1,3 @@
-# vim: sw=4:expandtab:foldmethod=marker
-#
 # Copyright (c) 2006, Mathieu Fenniak
 # All rights reserved.
 #
@@ -28,15 +26,13 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 
-"""
-Implementation of stream filters for PDF.
-"""
+"""Implementation of stream filters for PDF."""
 __author__ = "Mathieu Fenniak"
 __author_email__ = "biziqe@mathieu.fenniak.net"
 
+import math
 from .utils import PdfReadError, ord_, chr_
 from sys import version_info
-import math
 if version_info < ( 3, 0 ):
     from cStringIO import StringIO
 
