@@ -1,4 +1,5 @@
-# Copyright (c) 2006, Mathieu Fenniak
+# Original Copyright (c) 2006, Mathieu Fenniak
+# Modified by Chris Johnson and others 
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -31,15 +32,26 @@ __author__ = "Mathieu Fenniak"
 __author_email__ = "biziqe@mathieu.fenniak.net"
 
 import math
-from .utils import PdfReadError, ord_, chr_
+import struct
 from sys import version_info
+
+from .constants import CcittFaxDecodeParameters as CCITT
+from .constants import ColorSpaces
+from .constants import FilterTypeAbbreviations as FTA
+from .constants import FilterTypes as FT
+from .constants import ImageAttributes as IA
+from .constants import LzwFilterParameters as LZW
+from .constants import StreamAttributes as SA
+from .errors import PdfReadError
+from .utils import  ord_ 
+
 if version_info < ( 3, 0 ):
     from cStringIO import StringIO
 
 else:
     from io import StringIO
-    from io import BytesIO 
-    import struct
+
+
 
 try:
     import zlib
@@ -51,6 +63,7 @@ try:
         return zlib.compress(data)
 
 except ImportError:
+    # Has anyone tested this in the last 10 years cj Apr 2022
     # Unable to import zlib.  Attempt to use the System.IO.Compression
     # library from the .NET framework. (IronPython only)
     import System
@@ -172,7 +185,12 @@ class FlateDecode(object):
             raise PdfReadError("Unsupported flatedecode predictor %r" % predictor)
         return data
     decode = staticmethod(decode)
+    
+    def encode(data):
+        return compress(data)
 class ASCIIHexDecode(object):
+    # this does not work in Python 3
+    # 
     def decode(data, decodeParms=None):
         retval = ""
         char = ""
@@ -208,10 +226,7 @@ class LZWDecode(object):
             self.data=data
             self.bytepos=0
             self.bitpos=0
-            self.dict=[b"" for i in range(4096)]
-            for i in range(256):
-                self.dict[i]=bytes([i])
-
+            self.dict = [ bytes([i]) if i < 256 else b'' for i in range(4096) ]
             self.resetDict()
             bchar = [bytes([i])  for i in range(256) ]  # use bchar iterator to convert int to a single byte replace char
 
@@ -253,9 +268,9 @@ class LZWDecode(object):
                 if cW == -1:
                     raise PdfReadError("Missed the stop code in LZWDecode!")
                 if cW == self.STOP:
-                    break;
+                    break
                 elif cW == self.CLEARDICT:
-                    self.resetDict();
+                    self.resetDict()
                 elif pW == self.CLEARDICT:
                     baos+=self.dict[cW]
                 else:
@@ -275,7 +290,7 @@ class LZWDecode(object):
             return baos
 
     @staticmethod
-    def decode(data,decodeParams=None):
+    def decode(data, decodeParms=None):
         return LZWDecode.decoder(data).decode()
 
 
@@ -287,13 +302,13 @@ class ASCII85Decode(object):
             x = 0
             hitEod = False
             # remove all whitespace from data
-            data = [y for y in data if not (y in b' \n\r\t')]
+            data = [y for y in data if y not in ' \n\r\t']
             while not hitEod:
                 c = data[x]
                 if len(retval) == 0 and c == "<" and data[x+1] == "~":
                     x += 2
                     continue
-                #elif c.isspace():
+                # elif c.isspace():
                 #    x += 1
                 #    continue
                 elif c == b'z':
@@ -391,14 +406,15 @@ class CCITTFaxDecode(object):
                            279, 4, 1, imgSize,  # StripByteCounts, LONG, 1, size of image
                            0  # last IFD
                            )
-        
+
         return tiffHeader + data
     
     decode = staticmethod(decode)
     
 def decodeStreamData(stream):
     from .generic import NameObject
-    filters = stream.get("/Filter", ())
+    filters = stream.get(SA.FILTER, ())
+
     if len(filters) and not isinstance(filters[0], NameObject):
         # we have a single filter instance
         filters = (filters,)
@@ -406,24 +422,24 @@ def decodeStreamData(stream):
     # If there is not data to decode we should not try to decode the data.
     if data:
         for filterType in filters:
-            if filterType == "/FlateDecode" or filterType == "/Fl":
-                data = FlateDecode.decode(data, stream.get("/DecodeParms"))
-            elif filterType == "/ASCIIHexDecode" or filterType == "/AHx":
+            if filterType == FT.FLATE_DECODE or filterType == FTA.FL:
+                data = FlateDecode.decode(data, stream.get(SA.DECODE_PARMS))
+            elif filterType == FT.ASCII_HEX_DECODE or filterType == FTA.AHx:
                 data = ASCIIHexDecode.decode(data)
-            elif filterType == "/LZWDecode" or filterType == "/LZW":
-                data = LZWDecode.decode(data, stream.get("/DecodeParms"))
-            elif filterType == "/ASCII85Decode" or filterType == "/A85":
+            elif filterType == FT.LZW_DECODE or filterType == FTA.LZW:
+                data = LZWDecode.decode(data, stream.get(SA.DECODE_PARMS))
+            elif filterType == FT.ASCII_85_DECODE or filterType == FTA.A85:
                 data = ASCII85Decode.decode(data)
-            elif filterType == "/DCTDecode":
+            elif filterType == FT.DCT_DECODE:
                 data = DCTDecode.decode(data)
             elif filterType == "/JPXDecode":
                 data = JPXDecode.decode(data)
-            elif filterType == "/CCITTFaxDecode":
-                height = stream.get("/Height", ())
-                data = CCITTFaxDecode.decode(data, stream.get("/DecodeParms"), height)
+            elif filterType == FT.CCITT_FAX_DECODE:
+                height = stream.get(IA.HEIGHT, ())
+                data = CCITTFaxDecode.decode(data, stream.get(SA.DECODE_PARMS), height)
             elif filterType == "/Crypt":
-                decodeParams = stream.get("/DecodeParams", {})
-                if "/Name" not in decodeParams and "/Type" not in decodeParams:
+                decodeParms = stream.get(SA.DECODE_PARMS, {})
+                if "/Name" not in decodeParms and "/Type" not in decodeParms:
                     pass
                 else:
                     raise NotImplementedError("/Crypt filter with /Name or /Type not supported yet")
@@ -434,7 +450,6 @@ def decodeStreamData(stream):
 
 # change the transitions to character string
 #  
-import pdb  
 class Fax(object):
 
     # class constants     # type(self).tableV  

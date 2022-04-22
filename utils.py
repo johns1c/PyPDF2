@@ -1,4 +1,4 @@
-# Original Copyright (c) 2006, Mathieu Fenniak
+# Original Copyright 2006, Mathieu Fenniak
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -49,7 +49,7 @@ except ImportError:  # Py2.7
 xrange_fn = getattr(builtins, "xrange", range)
 _basestring = getattr(builtins, "basestring", str)
 
-bytes_type = type(bytes())  # Works the same in Python 2.X and 3.X
+bytes_type = type(bytes()) # Works the same in Python 2.X and 3.X
 string_type = getattr(builtins, "unicode", str)
 int_types = (int, long) if sys.version_info[0] < 3 else (int,)  # type: ignore  # noqa
 
@@ -68,17 +68,13 @@ def isInt(n):
 def isBytes(b):
     """Test if arg is a bytes instance. Compatible with Python 2 and 3."""
     import warnings
-    warnings.warn("PyPDF2.utils.isBytes will be deprecated ", DeprecationWarning)
+    warnings.warn("PyPDF2.utils.isBytes will be deprecated", DeprecationWarning)
     return isinstance(b, bytes_type)
 
 
 def formatWarning(message, category, filename, lineno, line=None):
-    """ custom implementation of warnings.formatwarning """
-    try:
-        # find the bare name
-        file = filename.replace("/", "\\").rsplit("\\", 1)[1]
-    except:
-        file = filename
+    """custom implementation of warnings.formatwarning"""
+    file = filename.replace("/", "\\").rsplit("\\", 1)[-1] # find the file name
     return "%s: %s [%s:%s]\n" % (category.__name__, message, file, lineno)
 
 
@@ -178,20 +174,20 @@ class ConvertFunctionsToVirtualList(object):
 
 
 def RC4_encrypt(key, plaintext):
-    S = [i for i in range(256)]
+    S = list(range(256))
     j = 0
     for i in range(256):
         j = (j + S[i] + ord_(key[i % len(key)])) % 256
         S[i], S[j] = S[j], S[i]
     i, j = 0, 0
-    retval = b_("")
+    retval = []
     for x in range(len(plaintext)):
         i = (i + 1) % 256
         j = (j + S[i]) % 256
         S[i], S[j] = S[j], S[i]
         t = S[(S[i] + S[j]) % 256]
-        retval += b_(chr(ord_(plaintext[x]) ^ t))
-    return retval
+        retval.append(b_(chr(ord_(plaintext[x]) ^ t)))
+    return b_("").join(retval)
 
 
 def matrixMultiply(a, b):
@@ -226,10 +222,16 @@ else:
         if type(s) == bytes:
             return s
         else:
-            r = s.encode('latin-1')
-            if len(s) < 2:
-                bc[s] = r
-            return r
+            try:
+                r = s.encode('latin-1')
+                if len(s) < 2:
+                    bc[s] = r
+                return r
+            except Exception:
+                r = s.encode('utf-8')
+                if len(s) < 2:
+                    bc[s] = r
+                return r
 
 
 def u_(s):
@@ -285,7 +287,6 @@ def hexStr(num):
 
 
 WHITESPACES = [b_(x) for x in [' ', '\n', '\r', '\t', '\x00']]
-
 
 def glyph2unicode( obj ):
     glyph2uni = dict()
@@ -882,4 +883,19 @@ def glyph2unicode( obj ):
         return glyph2uni[ obj ]
     except KeyError:
         return ''
-# end of source
+        
+        
+def paethPredictor(left, up, up_left):
+    # this is only used in png compression / decompression
+    # so I believe that the code should be put there
+    p = left + up - up_left
+    dist_left = abs(p - left)
+    dist_up = abs(p - up)
+    dist_up_left = abs(p - up_left)
+
+    if dist_left <= dist_up and dist_left <= dist_up_left:
+        return left
+    elif dist_up <= dist_up_left:
+        return up
+    else:
+        return up_left

@@ -1,4 +1,5 @@
-# Original Copyright (c) 2006, Mathieu Fenniak
+# Original Copyright 2006, Mathieu Fenniak
+# Further changes by Chris Johnson and Martin Thoma 2000 onwards
 # All rights reserved.
 #
 # fixed to handle comment at end of object - CJ December 2021 
@@ -26,7 +27,6 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
-#
 
 
 """
@@ -53,23 +53,37 @@ __author_email__ = "biziqe@mathieu.fenniak.net"
 
 import codecs
 import decimal
+import logger
 import re
 import warnings
 import sys
 
 from . import filters
 from . import utils
-from .utils import readNonWhitespace, RC4_encrypt, skipOverComment
-from .utils import b_, u_, chr_, ord_
-from .utils import PdfStreamError
+from .utils import (
+    RC4_encrypt,
+    b_,
+    chr_,
+    ord_,
+    readNonWhitespace,
+    skipOverComment,
+    u_,
+)
 
+from PyPDF2.constants import FilterTypes as FT
+from PyPDF2.constants import StreamAttributes as SA
+from PyPDF2.errors import (
+    STREAM_TRUNCATED_PREMATURELY,
+    PdfReadError,
+    PdfReadWarning,
+    PdfStreamError,
+)
 
 
 debug = False
+logger = logging.getLogger(__name__)
 
-# ObjectPrefix = b_('/<[tf(n%')  
-
-
+#ObjectPrefix = b_('/<[tf(n%')
 #NumberSigns = b_('+-')
 NumberChars = b'+-.0123456789' 
 IndirectPattern = re.compile(b"(\d+)\s+(\d+)\s+R[^a-zA-Z]")
@@ -174,7 +188,6 @@ class BooleanObject(PdfObject):
     def __init__(self, value):
         self.value = value
         
-        
     def __str__( self) :
         return(  "PyPDF2 generic boolean {}".format( self.value ) )
 
@@ -187,6 +200,7 @@ class BooleanObject(PdfObject):
         else:
             stream.write(b_("false"))
 
+    @staticmethod
     def readFromStream(stream):
         word = stream.read(4)
         if word == b_("true"):
@@ -286,7 +300,13 @@ class FloatObject(decimal.Decimal, PdfObject):
         try:
             return decimal.Decimal.__new__(cls, utils.str_(value), context)
         except Exception:
-            return decimal.Decimal.__new__(cls, str(value))
+            try:
+                return decimal.Decimal.__new__(cls, str(value))
+            except decimal.InvalidOperation:
+                # If this isn't a valid decimal (happens in malformed PDFs)
+                # fallback to 0
+                logger.warning("Invalid FloatObject {}".format(value))
+                return decimal.Decimal.__new__(cls, "0")
 
     def __repr__(self):
         if self == self.to_integral():
@@ -391,8 +411,7 @@ def readHexStringFromStream(stream):
     while True:
         tok = readNonWhitespace(stream)
         if not tok:
-            # stream has truncated prematurely
-            raise PdfStreamError("Stream has ended unexpectedly")
+            raise PdfStreamError(STREAM_TRUNCATED_PREMATURELY)
         if tok == b_(">"):
             break
         x += tok
@@ -408,6 +427,11 @@ def readHexStringFromStream(stream):
 
 
 def readStringFromStream(stream):
+
+    ESCAPE_DICT = {b'n': b'\n', b'r': b'\r', b't': b'\t', b'b': b'\x08',
+     b'f': b'\x0c', b'c': b'\\c', b'(': b'(', b'': b'', b'/': b'/',
+     b'\\': b'\\', b' ': b' ', b'%': b'%', b'<': b'<', b'>': b'>', b'[': b'[', b']': b']', b'#': b'#', b'_': b'_', b'&': b'&', b'$': b'$'
+     }
     tok = stream.read(1)
     parens = 1
     txt = b_("")
@@ -415,62 +439,41 @@ def readStringFromStream(stream):
         tok = stream.read(1)
         if not tok:
             raise PdfStreamError(STREAM_TRUNCATED_PREMATURELY)
-        if tok == b_("("):
+        if tok == b"(":
             parens += 1
-        elif tok == b_(")"):
+        elif tok == b")":
             parens -= 1
             if parens == 0:
                 break
-        elif tok == b_("\\"):
+        elif tok == b"\\":
             tok = stream.read(1)
-            if tok == b_("n"):
-                tok = b_("\n")
-            elif tok == b_("r"):
-                tok = b_("\r")
-            elif tok == b_("t"):
-                tok = b_("\t")
-            elif tok == b_("b"):
-                tok = b_("\b")
-            elif tok == b_("f"):
-                tok = b_("\f")
-            elif tok == b_("c"):
-                tok = b_("\c")
-            elif tok == b_("("):
-                tok = b_("(")
-            elif tok == b_(")"):
-                tok = b_(")")
-            elif tok == b_("/"):
-                tok = b_("/")
-            elif tok == b_("\\"):
-                tok = b_("\\")
-            elif tok in (b_(" "), b_("/"), b_("%"), b_("<"), b_(">"), b_("["), 
-                    b_("]"), b_("#"),  b_("_"), b_("&"), b_('$')):
-                # odd/unnessecary escape sequences we have encountered
-                tok = b_(tok)
-            elif tok.isdigit():
-                # "The number ddd may consist of one, two, or three
-                # octal digits; high-order overflow shall be ignored.
-                # Three octal digits shall be used, with leading zeros
-                # as needed, if the next character of the string is also
-                # a digit." (PDF reference 7.3.4.2, p 16)
-                for i in range(2):
-                    ntok = stream.read(1)
-                    if ntok.isdigit():
-                        tok += ntok
-                    else:
-                        break
-                tok = b_(chr(int(tok, base=8)))
-            elif tok in b_("\n\r"):
-                # This case is  hit when a backslash followed by a line
-                # break occurs.  If it's a multi-char EOL, consume the
-                # second character:
-                tok = stream.read(1)
-                if tok not in b_("\n\r"):
-                    stream.seek(-1, 1)
-                # Then don't add anything to the actual string, since this
-                # line break was escaped:
-                tok = b_('')
-            else:
+            try:
+                tok = ESCAPE_DICT[tok]
+            except KeyError:
+                if tok.isdigit():
+                    # "The number ddd may consist of one, two, or three
+                    # octal digits; high-order overflow shall be ignored.
+                    # Three octal digits shall be used, with leading zeros
+                    # as needed, if the next character of the string is also
+                    # a digit." (PDF reference 7.3.4.2, p 16)
+                    for _ in range(2):
+                        ntok = stream.read(1)
+                        if ntok.isdigit():
+                            tok += ntok
+                        else:
+                            break
+                    tok = b_(chr(int(tok, base=8)))
+                elif tok in b_("\n\r"):
+                    # This case is  hit when a backslash followed by a line
+                    # break occurs.  If it's a multi-char EOL, consume the
+                    # second character:
+                    tok = stream.read(1)
+                    if tok not in b_("\n\r"):
+                        stream.seek(-1, 1)
+                    # Then don't add anything to the actual string, since this
+                    # line break was escaped:
+                    tok = b_('')
+                else:
                     raise PdfReadError(r"Unexpected escaped string: %s" % tok)
         txt += tok
     return createStringObject(txt)
@@ -565,7 +568,7 @@ class NameObject(str, PdfObject):
         name = stream.read(1)
         if name != NameObject.surfix:
             raise PdfReadError("name read error")
-        name += utils.readUntilRegex(stream, NameObject.delimiterPattern, 
+        name += utils.readUntilRegex(stream, NameObject.delimiterPattern,
             ignore_eof=True)
         if debug: print(name)
         try:
@@ -640,11 +643,11 @@ class DictionaryObject(dict, PdfObject):
         stream.write(b_(">>"))
 
     def readFromStream(stream, pdf):
-        
+        #debug = True
         db_here = stream.tell()
         db_first = stream.read(250)
         stream.seek( db_here )         
-        #debug = True
+        
         # Dictionary starts with line <<
         tmp = stream.read(2)
         if tmp != b_("<<"):
@@ -658,8 +661,7 @@ class DictionaryObject(dict, PdfObject):
             tok = readNonWhitespace(stream)
             # cj2019 line below read if not tok
             if tok is None :  
-                # stream has truncated prematurely
-                raise PdfStreamError("Stream has ended unexpectedly in dict")
+                raise PdfStreamError(STREAM_TRUNCATED_PREMATURELY)
             if tok == b_(">"):
                 stream.read(1)
                 break
@@ -675,19 +677,17 @@ class DictionaryObject(dict, PdfObject):
             tok = readNonWhitespace(stream)
             stream.seek(-1, 1)
             value = readObject(stream, pdf)
-            #import pdb
-            #pdb.set_trace()
             if not data.get(key):
                 data[key] = value
             elif pdf.strict:
                 # multiple definitions of key not permitted
-                raise PdfReadError("Multiple definitions in dictionary at byte %s for key %s" \
-                                           % (utils.hexStr(stream.tell()), key))
+                raise PdfReadError(
+                    "Multiple definitions in dictionary at byte %s for key %s" \
+                    % (utils.hexStr(stream.tell()), key))
             else:
-                warnings.warn("Multiple definitions in dictionary at byte %s for key %s" \
-                                           % (utils.hexStr(stream.tell()), key), utils.PdfReadWarning)
-        
-        db_here = stream.tell()
+                warnings.warn(
+                    "Multiple definitions in dictionary at byte %s for key %s" \
+                    % (utils.hexStr(stream.tell()), key), PdfReadWarning)
 
         pos = stream.tell()
         s = readNonWhitespace(stream)
@@ -703,8 +703,8 @@ class DictionaryObject(dict, PdfObject):
                 if stream.read(1)  != b_('\n'):
                     stream.seek(-1, 1)
             # this is a stream object, not a dictionary
-            assert "/Length" in data
-            length = data["/Length"]
+            assert SA.LENGTH in data
+            length = data[SA.LENGTH]
             if debug: print(data)
             if isinstance(length, IndirectObject):
                 t = stream.tell()
@@ -902,9 +902,9 @@ class StreamObject(DictionaryObject):
         self.decodedSelf = None
 
     def writeToStream(self, stream, encryption_key):
-        self[NameObject("/Length")] = NumberObject(len(self._data))
+        self[NameObject(SA.LENGTH)] = NumberObject(len(self._data))
         DictionaryObject.writeToStream(self, stream, encryption_key)
-        del self["/Length"]
+        del self[SA.LENGTH]
         stream.write(b_("\nstream\n"))
         data = self._data
         if encryption_key:
@@ -913,22 +913,22 @@ class StreamObject(DictionaryObject):
         stream.write(b_("\nendstream"))
 
     def initializeFromDictionary(data):
-        if "/Filter" in data:
+        if SA.FILTER in data:
             retval = EncodedStreamObject()
         else:
             retval = DecodedStreamObject()
         retval._data = data["__streamdata__"]
         del data["__streamdata__"]
-        del data["/Length"]
+        del data[SA.LENGTH]
         retval.update(data)
         return retval
     initializeFromDictionary = staticmethod(initializeFromDictionary)
 
     def flateEncode(self):
-        if "/Filter" in self:
-            f = self["/Filter"]
+        if SA.FILTER in self:
+            f = self[SA.FILTER]
             if isinstance(f, ArrayObject):
-                f.insert(0, NameObject("/FlateDecode"))
+                f.insert(0, NameObject(FT.FLATE_DECODE))
             else:
                 newf = ArrayObject()
                 newf.append(NameObject("/FlateDecode"))
@@ -937,7 +937,7 @@ class StreamObject(DictionaryObject):
         else:
             f = NameObject("/FlateDecode")
         retval = EncodedStreamObject()
-        retval[NameObject("/Filter")] = f
+        retval[NameObject(SA.FILTER)] = f
         retval._data = filters.FlateDecode.encode(self._data)
         return retval
 
@@ -964,7 +964,7 @@ class EncodedStreamObject(StreamObject):
 
             decoded._data = filters.decodeStreamData(self)
             for key, value in list(self.items()):
-                if not key in ("/Length", "/Filter", "/DecodeParms"):
+                if key not in (SA.LENGTH, SA.FILTER, SA.DECODE_PARMS):
                     decoded[key] = value
             self.decodedSelf = decoded
             return decoded._data
@@ -1173,18 +1173,21 @@ class Destination(TreeObject):
         self[NameObject("/Page")] = page
         self[NameObject("/Type")] = typ
 
+        from PyPDF2.constants import TypArguments as TA
+        from PyPDF2.constants import TypFitArguments as TF
+
         # from table 8.2 of the PDF 1.7 reference.
         if typ == "/XYZ":
-            (self[NameObject("/Left")], self[NameObject("/Top")],
+            (self[NameObject(TA.LEFT)], self[NameObject(TA.TOP)],
                 self[NameObject("/Zoom")]) = args
-        elif typ == "/FitR":
-            (self[NameObject("/Left")], self[NameObject("/Bottom")],
-                self[NameObject("/Right")], self[NameObject("/Top")]) = args
-        elif typ in ["/FitH", "/FitBH"]:
-            self[NameObject("/Top")], = args
-        elif typ in ["/FitV", "/FitBV"]:
-            self[NameObject("/Left")], = args
-        elif typ in ["/Fit", "/FitB"]:
+        elif typ == TF.FIT_R:
+            (self[NameObject(TA.LEFT)], self[NameObject(TA.BOTTOM)],
+                self[NameObject(TA.RIGHT)], self[NameObject(TA.TOP)]) = args
+        elif typ in [TF.FIT_H, TF.FIT_BH]:
+            self[NameObject(TA.TOP)], = args
+        elif typ in [TF.FIT_V, TF.FIT_BV]:
+            self[NameObject(TA.LEFT)], = args
+        elif typ in [TF.FIT, TF.FIT_B]:
             pass
         else:
             raise PdfReadError("Unknown Destination Type: %r" % typ)
