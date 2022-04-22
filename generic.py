@@ -53,7 +53,7 @@ __author_email__ = "biziqe@mathieu.fenniak.net"
 
 import codecs
 import decimal
-import logger
+import logging
 import re
 import warnings
 import sys
@@ -429,7 +429,7 @@ def readHexStringFromStream(stream):
 def readStringFromStream(stream):
 
     ESCAPE_DICT = {b'n': b'\n', b'r': b'\r', b't': b'\t', b'b': b'\x08',
-     b'f': b'\x0c', b'c': b'\\c', b'(': b'(', b'': b'', b'/': b'/',
+     b'f': b'\x0c', b'c': b'\\c', b'(': b'(', b')': b')', b'/': b'/',
      b'\\': b'\\', b' ': b' ', b'%': b'%', b'<': b'<', b'>': b'>', b'[': b'[', b']': b']', b'#': b'#', b'_': b'_', b'&': b'&', b'$': b'$'
      }
     tok = stream.read(1)

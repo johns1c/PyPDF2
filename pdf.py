@@ -1175,7 +1175,7 @@ class PdfFileReader(object):
                     file.write(formatWarning(message, category, filename, lineno, line))
                 except IOError:
                     pass
-                except AttributeError
+                except AttributeError:
                     pass # probably because sys.stderr is None
                     
             warnings.showwarning = _showwarning
