@@ -1495,6 +1495,7 @@ _pdfDocEncoding = (
   u_('\u00f8'), u_('\u00f9'), u_('\u00fa'), u_('\u00fb'), u_('\u00fc'), u_('\u00fd'), u_('\u00fe'), u_('\u00ff')
 )
 
+assert len(_pdfDocEncoding) == 256
 
 _pdfDocEncoding_rev = {}
 for i in range(256):
