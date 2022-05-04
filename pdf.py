@@ -2149,7 +2149,7 @@ class PdfFileReader(object):
         return permissions
 
     def _decrypt(self, password):
-        encrypt = self.trailer['/Encrypt'].getObject()
+        encrypt = self.trailer[TK.ENCRYPT].getObject()
         if encrypt['/Filter'] != '/Standard':
             raise NotImplementedError("only Standard PDF encryption handler is available")
         if not (encrypt['/V'] in (1, 2)):
@@ -2264,6 +2264,7 @@ class PageObject(DictionaryObject):
         self.pdf = pdf
         self.indirectRef = indirectRef
 
+    @staticmethod
     def createBlankPage(pdf=None, width=None, height=None):
         """
         Returns a new blank page.
@@ -2297,7 +2298,6 @@ class PageObject(DictionaryObject):
             RectangleObject([0, 0, width, height]))
 
         return page
-    createBlankPage = staticmethod(createBlankPage)
 
     def rotateClockwise(self, angle):
         """
@@ -2329,6 +2329,7 @@ class PageObject(DictionaryObject):
         currentAngle = rotateObj if isinstance(rotateObj, int) else rotateObj.getObject()
         self[NameObject("/Rotate")] = NumberObject(currentAngle + angle)
 
+    @staticmethod
     def _mergeResources(res1, res2, resource):
         newRes = DictionaryObject()
         newRes.update(res1.get(resource, DictionaryObject()).getObject())
@@ -2342,8 +2343,8 @@ class PageObject(DictionaryObject):
             elif key not in newRes:
                 newRes[key] = page2Res.raw_get(key)
         return newRes, renameRes
-    _mergeResources = staticmethod(_mergeResources)
 
+    @staticmethod
     def _contentStreamRename(stream, rename, pdf):
         if not rename:
             return stream
@@ -2354,8 +2355,8 @@ class PageObject(DictionaryObject):
                 if isinstance(op, NameObject):
                     operands[i] = rename.get(op,op)
         return stream
-    _contentStreamRename = staticmethod(_contentStreamRename)
 
+    @staticmethod
     def _pushPopGS(contents, pdf):
         # adds a graphics state "push" and "pop" to the beginning and end
         # of a content stream.  This isolates it from changes such as
@@ -2364,8 +2365,8 @@ class PageObject(DictionaryObject):
         stream.operations.insert(0, [[], "q"])
         stream.operations.append([[], "Q"])
         return stream
-    _pushPopGS = staticmethod(_pushPopGS)
 
+    @staticmethod
     def _addTransformationMatrix(contents, pdf, ctm):
         # adds transformation matrix at the beginning of the given
         # contents stream.
@@ -2375,7 +2376,6 @@ class PageObject(DictionaryObject):
             FloatObject(c), FloatObject(d), FloatObject(e),
             FloatObject(f)], " cm"])
         return contents
-    _addTransformationMatrix = staticmethod(_addTransformationMatrix)
 
     def getContents(self):
         """
@@ -2475,8 +2475,8 @@ class PageObject(DictionaryObject):
             self.mediaBox.setUpperRight(upperright)
 
         self[NameObject('/Contents')] = ContentStream(newContentArray, self.pdf)
-        self[NameObject('/Resources')] = newResources
-        self[NameObject('/Annots')] = newAnnots
+        self[NameObject(PG.RESOURCES)] = newResources
+        self[NameObject(PG.ANNOTS)] = newAnnots
 
     def mergeTransformedPage(self, page2, ctm, expand=False):
         """
@@ -2505,9 +2505,11 @@ class PageObject(DictionaryObject):
             dimensions of the page to be merged.
         """
         # CTM to scale : [ sx 0 0 sy 0 0 ]
-        return self.mergeTransformedPage(page2, [scale, 0,
-                                                 0,      scale,
-                                                 0,      0], expand)
+        return self.mergeTransformedPage(
+            page2,
+            [scale, 0, 0, scale, 0, 0],
+            expand
+        )
 
     def mergeRotatedPage(self, page2, rotation, expand=False):
         """
@@ -2538,9 +2540,11 @@ class PageObject(DictionaryObject):
         :param bool expand: Whether the page should be expanded to fit the
             dimensions of the page to be merged.
         """
-        return self.mergeTransformedPage(page2, [1,  0,
-                                                 0,  1,
-                                                 tx, ty], expand)
+        return self.mergeTransformedPage(
+            page2,
+            [1, 0, 0, 1, tx, ty],
+            expand
+        )
 
     def mergeRotatedTranslatedPage(self, page2, rotation, tx, ty, expand=False):
         """
@@ -2656,11 +2660,6 @@ class PageObject(DictionaryObject):
                                                  ctm[1][0], ctm[1][1],
                                                  ctm[2][0], ctm[2][1]], expand)
 
-    ##
-    # Applys a transformation matrix the page.
-    #
-    # @param ctm   A 6 elements tuple containing the operands of the
-    #              transformation matrix
     def addTransformation(self, ctm):
         """
         Applies a transformation matrix to the page.
