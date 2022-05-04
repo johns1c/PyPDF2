@@ -295,6 +295,7 @@ class LZWDecode(object):
 
 
 class ASCII85Decode(object):
+    @staticmethod
     def decode(data, decodeParms=None):
         if version_info < ( 3, 0 ):
             retval = ""
@@ -371,16 +372,17 @@ class ASCII85Decode(object):
     decode = staticmethod(decode)
 
 class DCTDecode(object):
+    @staticmethod
     def decode(data, decodeParms=None):
         return data
-    decode = staticmethod(decode)
-    
+
 class JPXDecode(object):
+    @staticmethod
     def decode(data, decodeParms=None):
         return data
-    decode = staticmethod(decode)
-    
-class CCITTFaxDecode(object):   
+
+class CCITTFaxDecode(object):
+    @staticmethod
     def decode(data, decodeParms=None, height=0):
         if decodeParms:
             if decodeParms.get("/K", 1) == -1:
@@ -408,9 +410,8 @@ class CCITTFaxDecode(object):
                            )
 
         return tiffHeader + data
-    
-    decode = staticmethod(decode)
-    
+
+
 def decodeStreamData(stream):
     from .generic import NameObject
     filters = stream.get(SA.FILTER, ())
