@@ -58,7 +58,6 @@ import logging
 import re
 import warnings
 
-from . import filters, utils
 from PyPDF2.constants import FilterTypes as FT
 from PyPDF2.constants import StreamAttributes as SA
 
@@ -66,9 +65,10 @@ from PyPDF2.errors import (
     STREAM_TRUNCATED_PREMATURELY,
     PdfStreamError,
     PdfReadError,
+    PdfReadWarning,
 )
 
-
+from . import filters, utils
 from .utils import (
     RC4_encrypt,
     b_,
@@ -653,10 +653,10 @@ class ByteStringObject(utils.bytes_type, PdfObject):  # type: ignore
     /O) is clearly not text, but is still stored in a "String" object.
     """
 
-    ##
-    # For compatibility with TextStringObject.original_bytes.  This method
-    # returns self.
-    original_bytes = property(lambda self: self)
+    @property
+    def original_bytes(self):
+        """For compatibility with TextStringObject.original_bytes."""
+        return self
 
     def writeToStream(self, stream, encryption_key):
         bytearr = self
@@ -678,12 +678,16 @@ class TextStringObject(utils.string_type, PdfObject):  # type: ignore
     autodetect_pdfdocencoding = False
     autodetect_utf16 = False
 
-    ##
-    # It is occasionally possible that a text string object gets created where
-    # a byte string object was expected due to the autodetection mechanism --
-    # if that occurs, this "original_bytes" property can be used to
-    # back-calculate what the original encoded bytes were.
-    original_bytes = property(lambda self: self.get_original_bytes())
+    @property
+    def original_bytes(self):
+        """
+        It is possible that a text string object gets created where
+        a byte string object was expected due to the autodetection mechanism --
+        if that occurs, this "original_bytes" property can be used to
+        back-calculate what the original encoded bytes were.  This will
+        not always work 
+        """
+        return self.get_original_bytes()
 
     def get_original_bytes(self):
         # We're a text string object, but the library is trying to get our raw
@@ -749,7 +753,7 @@ class NameObject(str, PdfObject):
             # Name objects should represent irregular characters
             # with a '#' followed by the symbol's hex number
             if not pdf.strict:
-                warnings.warn("Illegal character in Name Object", utils.PdfReadWarning)
+                warnings.warn("Illegal character in Name Object", PdfReadWarning)
                 return NameObject(name)
             else:
                 raise PdfReadError("Illegal character in Name Object")
@@ -780,15 +784,8 @@ class DictionaryObject(dict, PdfObject):
             return dict.__getitem__(self, key).getObject()
         except KeyError:
             return None
-
-    ##
-    # Retrieves XMP (Extensible Metadata Platform) data relevant to the
-    # this object, if available.
-    # <p>
-    # Stability: Added in v1.12, will exist for all future v1.x releases.
-    # @return Returns a {@link #xmp.XmpInformation XmlInformation} instance
-    # that can be used to access XMP metadata from the document.  Can also
-    # return None if no metadata was found on the document root.
+            
+    
     def getXmpMetadata(self):
         metadata = self.get("/Metadata", None)
         if metadata is None:
@@ -969,18 +966,24 @@ class TreeObject(DictionaryObject):
 
     def children(self):
         if not self.hasChildren():
-            raise StopIteration
+            if sys.version_info >= (3, 5):  # PEP 479
+                return
+            else:
+                raise StopIteration
 
         child = self["/First"]
         while True:
             yield child
             if child == self["/Last"]:
-                raise StopIteration
+                if sys.version_info >= (3, 5):  # PEP 479
+                    return
+                else:
+                    raise StopIteration
             child = child["/Next"]
 
     def addChild(self, child, pdf):
-        childObj = child.getObject()
-        child = pdf.getReference(childObj)
+        child_obj = child.getObject()
+        child = pdf.getReference(child_obj)
         assert isinstance(child, IndirectObject)
 
         if "/First" not in self:
@@ -994,39 +997,39 @@ class TreeObject(DictionaryObject):
         self[NameObject("/Count")] = NumberObject(self[NameObject("/Count")] + 1)
 
         if prev:
-            prevRef = pdf.getReference(prev)
-            assert isinstance(prevRef, IndirectObject)
-            childObj[NameObject("/Prev")] = prevRef
+            prev_ref = pdf.getReference(prev)
+            assert isinstance(prev_ref, IndirectObject)
+            child_obj[NameObject("/Prev")] = prev_ref
             prev[NameObject("/Next")] = child
 
-        parentRef = pdf.getReference(self)
-        assert isinstance(parentRef, IndirectObject)
-        childObj[NameObject("/Parent")] = parentRef
+        parent_ref = pdf.getReference(self)
+        assert isinstance(parent_ref, IndirectObject)
+        child_obj[NameObject("/Parent")] = parent_ref
 
     def removeChild(self, child):
-        childObj = child.getObject()
+        child_obj = child.getObject()
 
-        if NameObject("/Parent") not in childObj:
+        if NameObject("/Parent") not in child_obj:
             raise ValueError("Removed child does not appear to be a tree item")
-        elif childObj[NameObject("/Parent")] != self:
+        elif child_obj[NameObject("/Parent")] != self:
             raise ValueError("Removed child is not a member of this tree")
 
         found = False
-        prevRef = None
+        prev_ref = None
         prev = None
-        curRef = self[NameObject("/First")]
-        cur = curRef.getObject()
-        lastRef = self[NameObject("/Last")]
-        last = lastRef.getObject()
+        cur_ref = self[NameObject("/First")]
+        cur = cur_ref.getObject()
+        last_ref = self[NameObject("/Last")]
+        last = last_ref.getObject()
         while cur is not None:
-            if cur == childObj:
+            if cur == child_obj:
                 if prev is None:
                     if NameObject("/Next") in cur:
                         # Removing first tree node
-                        nextRef = cur[NameObject("/Next")]
-                        next = nextRef.getObject()
+                        next_ref = cur[NameObject("/Next")]
+                        next = next_ref.getObject()
                         del next[NameObject("/Prev")]
-                        self[NameObject("/First")] = nextRef
+                        self[NameObject("/First")] = next_ref
                         self[NameObject("/Count")] = self[NameObject("/Count")] - 1
 
                     else:
@@ -1039,46 +1042,46 @@ class TreeObject(DictionaryObject):
                 else:
                     if NameObject("/Next") in cur:
                         # Removing middle tree node
-                        nextRef = cur[NameObject("/Next")]
-                        next = nextRef.getObject()
-                        next[NameObject("/Prev")] = prevRef
-                        prev[NameObject("/Next")] = nextRef
+                        next_ref = cur[NameObject("/Next")]
+                        next = next_ref.getObject()
+                        next[NameObject("/Prev")] = prev_ref
+                        prev[NameObject("/Next")] = next_ref
                         self[NameObject("/Count")] = self[NameObject("/Count")] - 1
                     else:
                         # Removing last tree node
                         assert cur == last
                         del prev[NameObject("/Next")]
-                        self[NameObject("/Last")] = prevRef
+                        self[NameObject("/Last")] = prev_ref
                         self[NameObject("/Count")] = self[NameObject("/Count")] - 1
                 found = True
                 break
 
-            prevRef = curRef
+            prev_ref = cur_ref
             prev = cur
             if NameObject("/Next") in cur:
-                curRef = cur[NameObject("/Next")]
-                cur = curRef.getObject()
+                cur_ref = cur[NameObject("/Next")]
+                cur = cur_ref.getObject()
             else:
-                curRef = None
+                cur_ref = None
                 cur = None
 
         if not found:
             raise ValueError("Removal couldn't find item in tree")
 
-        del childObj[NameObject("/Parent")]
-        if NameObject("/Next") in childObj:
-            del childObj[NameObject("/Next")]
-        if NameObject("/Prev") in childObj:
-            del childObj[NameObject("/Prev")]
+        del child_obj[NameObject("/Parent")]
+        if NameObject("/Next") in child_obj:
+            del child_obj[NameObject("/Next")]
+        if NameObject("/Prev") in child_obj:
+            del child_obj[NameObject("/Prev")]
 
     def emptyTree(self):
         for child in self:
-            childObj = child.getObject()
-            del childObj[NameObject("/Parent")]
-            if NameObject("/Next") in childObj:
-                del childObj[NameObject("/Next")]
-            if NameObject("/Prev") in childObj:
-                del childObj[NameObject("/Prev")]
+            child_obj = child.getObject()
+            del child_obj[NameObject("/Parent")]
+            if NameObject("/Next") in child_obj:
+                del child_obj[NameObject("/Next")]
+            if NameObject("/Prev") in child_obj:
+                del child_obj[NameObject("/Prev")]
 
         if NameObject("/Count") in self:
             del self[NameObject("/Count")]
@@ -1296,61 +1299,69 @@ class Field(TreeObject):
             except KeyError:
                 pass
 
-    fieldType = property(lambda self: self.get("/FT"))
-    """
-    Read-only property accessing the type of this field.
-    """
+    @property
+    def fieldType(self):
+        """Read-only property accessing the type of this field."""
+        return self.get("/FT")
 
-    parent = property(lambda self: self.get("/Parent"))
-    """
-    Read-only property accessing the parent of this field.
-    """
+    @property
+    def parent(self):
+        """Read-only property accessing the parent of this field."""
+        return self.get("/Parent")
 
-    kids = property(lambda self: self.get("/Kids"))
-    """
-    Read-only property accessing the kids of this field.
-    """
+    @property
+    def kids(self):
+        """Read-only property accessing the kids of this field."""
+        return self.get("/Kids")
 
-    name = property(lambda self: self.get("/T"))
-    """
-    Read-only property accessing the name of this field.
-    """
+    @property
+    def name(self):
+        """Read-only property accessing the name of this field."""
+        return self.get("/T")
 
-    altName = property(lambda self: self.get("/TU"))
-    """
-    Read-only property accessing the alternate name of this field.
-    """
+    @property
+    def altName(self):
+        """Read-only property accessing the alternate name of this field."""
+        return self.get("/TU")
 
-    mappingName = property(lambda self: self.get("/TM"))
-    """
-    Read-only property accessing the mapping name of this field. This
-    name is used by PyPDF2 as a key in the dictionary returned by
-    :meth:`getFields()<PyPDF2.PdfFileReader.getFields>`
-    """
+    @property
+    def mappingName(self):
+        """
+        Read-only property accessing the mapping name of this field. This
+        name is used by PyPDF2 as a key in the dictionary returned by
+        :meth:`getFields()<PyPDF2.PdfFileReader.getFields>`
+        """
+        return self.get("/TM")
 
-    flags = property(lambda self: self.get("/Ff"))
-    """
-    Read-only property accessing the field flags, specifying various
-    characteristics of the field (see Table 8.70 of the PDF 1.7 reference).
-    """
+    @property
+    def flags(self):
+        """
+        Read-only property accessing the field flags, specifying various
+        characteristics of the field (see Table 8.70 of the PDF 1.7 reference).
+        """
+        return self.get("/Ff")
 
-    value = property(lambda self: self.get("/V"))
-    """
-    Read-only property accessing the value of this field. Format
-    varies based on field type.
-    """
+    @property
+    def value(self):
+        """
+        Read-only property accessing the value of this field. Format
+        varies based on field type.
+        """
+        return self.get("/V")
 
-    defaultValue = property(lambda self: self.get("/DV"))
-    """
-    Read-only property accessing the default value of this field.
-    """
+    @property
+    def defaultValue(self):
+        """Read-only property accessing the default value of this field."""
+        return self.get("/DV")
 
-    additionalActions = property(lambda self: self.get("/AA"))
-    """
-    Read-only property accessing the additional actions dictionary.
-    This dictionary defines the field's behavior in response to trigger events.
-    See Section 8.5.2 of the PDF 1.7 reference.
-    """
+    @property
+    def additionalActions(self):
+        """
+        Read-only property accessing the additional actions dictionary.
+        This dictionary defines the field's behavior in response to trigger events.
+        See Section 8.5.2 of the PDF 1.7 reference.
+        """
+        self.get("/AA")
 
 
 class Destination(TreeObject):
@@ -1434,61 +1445,77 @@ class Destination(TreeObject):
         stream.write(b_("\n"))
         stream.write(b_(">>"))
 
-    title = property(lambda self: self.get("/Title"))
-    """
-    Read-only property accessing the destination title.
+    @property
+    def title(self):
+        """
+        Read-only property accessing the destination title.
 
-    :rtype: str
-    """
+        :rtype: str
+        """
+        return self.get("/Title")
 
-    page = property(lambda self: self.get("/Page"))
-    """
-    Read-only property accessing the destination page number.
+    @property
+    def page(self):
+        """
+        Read-only property accessing the destination page number.
 
-    :rtype: int
-    """
+        :rtype: int
+        """
+        return self.get("/Page")
 
-    typ = property(lambda self: self.get("/Type"))
-    """
-    Read-only property accessing the destination type.
+    @property
+    def typ(self):
+        """
+        Read-only property accessing the destination type.
 
-    :rtype: str
-    """
+        :rtype: str
+        """
+        return self.get("/Type")
 
-    zoom = property(lambda self: self.get("/Zoom", None))
-    """
-    Read-only property accessing the zoom factor.
+    @property
+    def zoom(self):
+        """
+        Read-only property accessing the zoom factor.
 
-    :rtype: int, or ``None`` if not available.
-    """
+        :rtype: int, or ``None`` if not available.
+        """
+        return self.get("/Zoom", None)
 
-    left = property(lambda self: self.get("/Left", None))
-    """
-    Read-only property accessing the left horizontal coordinate.
+    @property
+    def left(self):
+        """
+        Read-only property accessing the left horizontal coordinate.
 
-    :rtype: int, or ``None`` if not available.
-    """
+        :rtype: int, or ``None`` if not available.
+        """
+        return self.get("/Left", None)
 
-    right = property(lambda self: self.get("/Right", None))
-    """
-    Read-only property accessing the right horizontal coordinate.
+    @property
+    def right(self):
+        """
+        Read-only property accessing the right horizontal coordinate.
 
-    :rtype: int, or ``None`` if not available.
-    """
+        :rtype: int, or ``None`` if not available.
+        """
+        return self.get("/Right", None)
 
-    top = property(lambda self: self.get("/Top", None))
-    """
-    Read-only property accessing the top vertical coordinate.
+    @property
+    def top(self):
+        """
+        Read-only property accessing the top vertical coordinate.
 
-    :rtype: int, or ``None`` if not available.
-    """
+        :rtype: int, or ``None`` if not available.
+        """
+        return self.get("/Top", None)
 
-    bottom = property(lambda self: self.get("/Bottom", None))
-    """
-    Read-only property accessing the bottom vertical coordinate.
+    @property
+    def bottom(self):
+        """
+        Read-only property accessing the bottom vertical coordinate.
 
-    :rtype: int, or ``None`` if not available.
-    """
+        :rtype: int, or ``None`` if not available.
+        """
+        return self.get("/Bottom", None)
 
 
 class Bookmark(Destination):

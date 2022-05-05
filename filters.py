@@ -52,7 +52,7 @@ try:
     def compress(data):
         return zlib.compress(data)
 
-except ImportError:
+except ImportError:  # pragma: no cover
     # Has anyone tested this in the last 10 years cj Apr 2022
     # Unable to import zlib.  Attempt to use the System.IO.Compression
     # library from the .NET framework. (IronPython only)
@@ -114,6 +114,12 @@ class FlateDecode(object):
     """zipped object with optional png pre-compression"""
 
     def decode(data, decodeParms):
+        """
+        :param data: flate-encoded data.
+        :param decodeParms: a dictionary of values, understanding the
+            "/Predictor":<int> key only
+        :return: the flate-decoded data.
+        """
         data = decompress(data)
         if decodeParms is None:
             return data
@@ -267,9 +273,13 @@ class LZWDecode(object):
             return value
 
         def decode(self):
-            """algorithm derived from:
+            """
+            TIFF 6.0 specification explains in sufficient details the steps to
+            implement the LZW encode() and decode() algorithms.
             http://www.rasip.fer.hr/research/compress/algorithms/fund/lz/lzw.html
             and the PDFReference
+
+            :rtype: bytes
             """
             cW = self.CLEARDICT
             baos = b""  # output is bytestring for Python 3
@@ -304,20 +314,30 @@ class LZWDecode(object):
 
     @staticmethod
     def decode(data, decodeParms=None):
+        """
+        :param data: ``bytes`` or ``str`` text to decode.
+        :param decodeParms: a dictionary of parameter values.
+        :return: decoded data.
+        :rtype: bytes
+        """
         return LZWDecode.decoder(data).decode()
 
 
 class ASCII85Decode(object):
+    """Decodes string ASCII85-encoded data into a byte format.
+       Python 3 standard library can be used here
+    """
+
     @staticmethod
     def decode(data, decodeParms=None):
         if version_info < (3, 0):
             retval = ""
             group = []
             x = 0
-            hitEod = False
+            hit_eod = False
             # remove all whitespace from data
             data = [y for y in data if y not in " \n\r\t"]
-            while not hitEod:
+            while not hit_eod:
                 c = data[x]
                 if len(retval) == 0 and c == "<" and data[x + 1] == "~":
                     x += 2
@@ -336,7 +356,7 @@ class ASCII85Decode(object):
                         assert len(group) > 1
                         cnt = len(group) - 1
                         group += [85, 85, 85]
-                        hitEod = cnt
+                        hit_eod = cnt
                     else:
                         break
                 else:
@@ -357,8 +377,8 @@ class ASCII85Decode(object):
                     c2 = chr((b >> 16) % 256)
                     c1 = chr(b >> 24)
                     retval += c1 + c2 + c3 + c4
-                    if hitEod:
-                        retval = retval[: -4 + hitEod]
+                    if hit_eod:
+                        retval = retval[: -4 + hit_eod]
                     group = []
                 x += 1
             return retval
