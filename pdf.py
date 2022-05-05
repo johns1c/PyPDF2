@@ -59,6 +59,11 @@ import codecs
 import warnings
 from hashlib import md5
 
+from PyPDF2._page import *  # noqa: F401
+from PyPDF2._reader import *  # noqa: F401
+from PyPDF2._writer import *  # noqa: F401
+
+
 from PyPDF2.constants import CatalogAttributes as CA
 from PyPDF2.constants import Core as CO
 from PyPDF2.constants import PageAttributes as PG
