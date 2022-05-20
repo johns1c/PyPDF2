@@ -33,6 +33,7 @@ import math
 import struct
 from io import BytesIO
 from sys import version_info
+import zlib
 
 from .constants import CcittFaxDecodeParameters as CCITT
 from .constants import ColorSpaces
@@ -43,66 +44,23 @@ from .constants import LzwFilterParameters as LZW
 from .constants import StreamAttributes as SA
 from .errors import PdfReadError
 
-try:
-    import zlib
 
-    def decompress(data):
+def decompress(data):
+    try:
         return zlib.decompress(data)
-
-    def compress(data):
-        return zlib.compress(data)
-
-except ImportError:  # pragma: no cover
-    # Has anyone tested this in the last 10 years cj Apr 2022
-    # Unable to import zlib.  Attempt to use the System.IO.Compression
-    # library from the .NET framework. (IronPython only)
-    import System
-    from System import IO, Array, Collections
-
-    def _string_to_bytearr(buf):
-        retval = Array.CreateInstance(System.Byte, len(buf))
-        for i in range(len(buf)):
-            retval[i] = ord(buf[i])
-        return retval
+    except zlib.error:
+        d = zlib.decompressobj(zlib.MAX_WBITS | 32)
+        result_str = b""
+        for b in [data[i : i + 1] for i in range(len(data))]:
+            try:
+                result_str += d.decompress(b)
+            except zlib.error:
+                pass
+        return result_str
 
 
-    def _read_bytes(stream):
-        ms = IO.MemoryStream()
-        buf = Array.CreateInstance(System.Byte, 2048)
-        while True:
-            bytes = stream.Read(buf, 0, buf.Length)
-            if bytes == 0:
-                break
-            else:
-                ms.Write(buf, 0, bytes)
-        retval = ms.ToArray()
-        ms.Close()
-        return retval
-
-    def decompress(data):
-        bytes = _string_to_bytearr(data)
-        ms = IO.MemoryStream()
-        ms.Write(bytes, 0, bytes.Length)
-        ms.Position = 0  # fseek 0
-        gz = IO.Compression.DeflateStream(ms, IO.Compression.CompressionMode.Decompress)
-        bytes = _read_bytes(gz)
-        retval = _bytearr_to_string(bytes)
-        gz.Close()
-        return retval
-
-    def compress(data):
-        bytes = _string_to_bytearr(data)
-        ms = IO.MemoryStream()
-        gz = IO.Compression.DeflateStream(
-            ms, IO.Compression.CompressionMode.Compress, True
-        )
-        gz.Write(bytes, 0, bytes.Length)
-        gz.Close()
-        ms.Position = 0  # fseek 0
-        bytes = ms.ToArray()
-        retval = _bytearr_to_string(bytes)
-        ms.Close()
-        return retval
+def compress(data):
+    return zlib.compress(data)
 
 
 class FlateDecode(object):
