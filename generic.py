@@ -57,15 +57,16 @@ import decimal
 import logging
 import re
 import warnings
+from io import BytesIO 
 
 from PyPDF2.constants import FilterTypes as FT
 from PyPDF2.constants import StreamAttributes as SA
 
 from PyPDF2.errors import (
     STREAM_TRUNCATED_PREMATURELY,
-    PdfStreamError,
     PdfReadError,
     PdfReadWarning,
+    PdfStreamError,
 )
 
 from . import filters, utils
