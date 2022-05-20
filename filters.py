@@ -65,11 +65,6 @@ except ImportError:  # pragma: no cover
             retval[i] = ord(buf[i])
         return retval
 
-    def _bytearr_to_string(bytes):
-        retval = ""
-        for i in range(bytes.Length):
-            retval += chr(bytes[i])
-        return retval
 
     def _read_bytes(stream):
         ms = IO.MemoryStream()
@@ -112,7 +107,8 @@ except ImportError:  # pragma: no cover
 
 class FlateDecode(object):
     """zipped object with optional png pre-compression"""
-
+    
+    @staticmethod
     def decode(data, decodeParms):
         """
         :param data: flate-encoded data.
@@ -195,8 +191,8 @@ class FlateDecode(object):
             raise PdfReadError("Unsupported flatedecode predictor %r" % predictor)
         return data
 
-    decode = staticmethod(decode)
 
+    @staticmethod
     def encode(data):
         return compress(data)
 
