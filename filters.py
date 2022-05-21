@@ -65,7 +65,7 @@ def compress(data):
 
 class FlateDecode(object):
     """zipped object with optional png pre-compression"""
-    
+
     @staticmethod
     def decode(data, decodeParms):
         """
@@ -148,7 +148,6 @@ class FlateDecode(object):
             # unsupported predictor
             raise PdfReadError("Unsupported flatedecode predictor %r" % predictor)
         return data
-
 
     @staticmethod
     def encode(data):
@@ -279,7 +278,7 @@ class LZWDecode(object):
 
 class ASCII85Decode(object):
     """Decodes string ASCII85-encoded data into a byte format.
-       Python 3 standard library can be used here
+    Python 3 standard library can be used here
     """
 
     @staticmethod

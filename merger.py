@@ -36,10 +36,12 @@ from PyPDF2.utils import isString, str_
 
 if version_info < (3, 0):
     from cStringIO import StringIO
+
     StreamIO = StringIO
 else:
     from io import BytesIO
     from io import FileIO as file
+
     StreamIO = BytesIO
 
 
@@ -48,6 +50,7 @@ class _MergedPage(object):
     _MergedPage is used internally by PdfFileMerger to collect necessary
     information on each page that is being merged.
     """
+
     def __init__(self, pagedata, src, id):
         self.src = src
         self.pagedata = pagedata
@@ -442,7 +445,7 @@ class PdfFileMerger(object):
         )
 
         # not certain what the returned values mean
-        # or if they are correct cj 
+        # or if they are correct cj
         page_no = i
         pdf = p.src  # noqa: F841
         return (page_no, pdf)

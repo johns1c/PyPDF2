@@ -48,7 +48,7 @@ from PyPDF2.generic import (
     NumberObject,
     RectangleObject,
     TextStringObject,
-    ByteStringObject
+    ByteStringObject,
 )
 from PyPDF2.utils import u_
 
@@ -713,34 +713,38 @@ class PageObject(DictionaryObject):
 
             if False:
                 pass
-            elif operator == b'Tf':
+            elif operator == b"Tf":
 
                 current_font_name = operands[0]
-                current_font, current_font_encoding = FetchFontExtended(self , current_font_name , Debug=DEBUG)
+                current_font, current_font_encoding = FetchFontExtended(
+                    self, current_font_name, Debug=DEBUG
+                )
                 assert current_font_encoding is not None
 
             elif operator == b"Tm":
-                 pass
+                pass
             elif operator == b"Tj":
-                nt = as_text( operands[0],encoding=current_font_encoding)
+                nt = as_text(operands[0], encoding=current_font_encoding)
                 text += nt + TJ_sep
             elif operator == b"T*":
                 text += "\n"
             elif operator == b"'":
-                text += "\n" + as_text( operands[0],encoding=current_font_encoding)
+                text += "\n" + as_text(operands[0], encoding=current_font_encoding)
             elif operator == b'"':
-                text += "\n" + as_text( operands[2],encoding=current_font_encoding)
+                text += "\n" + as_text(operands[2], encoding=current_font_encoding)
             elif operator == b"TJ":
 
                 for i in operands[0]:
-                    if isinstance(i, (TextStringObject,ByteStringObject,bytes) ):
-                        text += as_text(i,encoding=current_font_encoding)
-                    elif isinstance( i , (NumberObject,FloatObject)) and ( i < word_space_limit ) :
+                    if isinstance(i, (TextStringObject, ByteStringObject, bytes)):
+                        text += as_text(i, encoding=current_font_encoding)
+                    elif isinstance(i, (NumberObject, FloatObject)) and (
+                        i < word_space_limit
+                    ):
                         text += " "
-                    elif isinstance( i , (NumberObject,FloatObject)) :
+                    elif isinstance(i, (NumberObject, FloatObject)):
                         pass
                     else:
-                        print('TJ operator error' , type(i),i )
+                        print("TJ operator error", type(i), i)
 
                 text += TJ_sep
 

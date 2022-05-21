@@ -484,6 +484,7 @@ def createStringObjectOrig(string):
     else:
         raise TypeError("createStringObject should have str or unicode arg")
 
+
 def skipWhitespace(stream):
     WHITESPACES = [b" ", b"\n", b"\r", b"\t", b"\x00", b"%"]
     tok = WHITESPACES[0]
@@ -494,6 +495,7 @@ def skipWhitespace(stream):
         else:
             tok = stream.read(1)
     stream.seek(-1, 1)
+
 
 def readHexStringFromStream(stream):
 
@@ -849,7 +851,7 @@ class DictionaryObject(dict, PdfObject):
             stream.seek(-1, 1)
             value = readObject(stream, pdf)
             try:
-                new_key = not data.get(key)
+                _new_key = not data.get(key)
             except Exception:
                 print("problem with key ", type(key), key)
                 print("value ", value)
@@ -1165,6 +1167,7 @@ class EncodedStreamObject(StreamObject):
 
     def setData(self, data):
         raise PdfReadError("Creating EncodedStreamObject is not currently supported")
+
 
 class ContentStream(DecodedStreamObject):
     def __init__(self, stream, pdf):

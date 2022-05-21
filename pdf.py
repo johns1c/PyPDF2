@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #
-#todo 
+# todo
 #
-#  allow indirect objects to replace integer and other values 
-#  using code similar to that for rotation 
+#  allow indirect objects to replace integer and other values
+#  using code similar to that for rotation
 #  translate all the standard encodings properly
-#  
+#
 #
 # Original Copyright 2006, Mathieu Fenniak
 # Copyright (c) 2007, Ashish Kulkarni <kulkarni.ashish@gmail.com>
