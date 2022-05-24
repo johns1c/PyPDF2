@@ -277,7 +277,8 @@ class LZWDecode(object):
 
 
 class ASCII85Decode(object):
-    """Decodes string ASCII85-encoded data into a byte format.
+    """
+    Decodes string ASCII85-encoded data into a byte format.
     Python 3 standard library can be used here
     """
 
