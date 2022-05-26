@@ -26,14 +26,13 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 """Implementation of stream filters for PDF."""
-__author__ = "Mathieu Fenniak"
-__author_email__ = "biziqe@mathieu.fenniak.net"
 
+import base64
 import math
 import struct
+import zlib
 from io import BytesIO
 from sys import version_info
-import zlib
 
 from .constants import CcittFaxDecodeParameters as CCITT
 from .constants import ColorSpaces
@@ -299,9 +298,11 @@ class ASCII85Decode(object):
 
     """
 
-    @staticmethod
     def decode(data, decodeParms=None):
         assert isinstance(data, bytes)
+        if data[-2:] == b"~>":
+            data = data[:-2]
+
         return base64.a85decode(data)
 
     decode = staticmethod(decode)
