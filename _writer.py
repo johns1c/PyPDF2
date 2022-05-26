@@ -64,7 +64,7 @@ from PyPDF2.generic import (
     TreeObject,
     createStringObject,
 )
-from PyPDF2.utils import b_, isString, u_
+from PyPDF2._utils import b_, isString, u_
 
 logger = logging.getLogger(__name__)
 
@@ -148,8 +148,8 @@ class PdfFileWriter(object):
             need_appearances = NameObject("/NeedAppearances")
             self._root_object["/AcroForm"][need_appearances] = BooleanObject(True)
 
-        except Exception as e:
-            logger.error("set_need_appearances_writer() catch : ", repr(e))
+        except Exception as exc:
+            logger.error("set_need_appearances_writer() catch : ", repr(exc))
 
     def addPage(self, page):
         """
@@ -675,6 +675,7 @@ class PdfFileWriter(object):
 
     def getOutlineRoot(self):
         if CO.OUTLINES in self._root_object:
+            # TABLE 3.25 Entries in the catalog dictionary
             outline = self._root_object[CO.OUTLINES]
             idnum = self._objects.index(outline) + 1
             outline_ref = IndirectObject(idnum, 0, self)
@@ -696,11 +697,13 @@ class PdfFileWriter(object):
             names_ref = IndirectObject(idnum, 0, self)
             assert names_ref.getObject() == names
             if CA.DESTS in names and isinstance(names[CA.DESTS], DictionaryObject):
+                # 3.6.3 Name Dictionary (PDF spec 1.7)
                 dests = names[CA.DESTS]
                 idnum = self._objects.index(dests) + 1
                 dests_ref = IndirectObject(idnum, 0, self)
                 assert dests_ref.getObject() == dests
                 if CA.NAMES in dests:
+                    # TABLE 3.33 Entries in a name tree node dictionary
                     nd = dests[CA.NAMES]
                 else:
                     nd = ArrayObject()

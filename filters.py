@@ -155,33 +155,48 @@ class FlateDecode(object):
 
 
 class ASCIIHexDecode(object):
-    # this does not work in Python 3
-    #
+    # rewritten for Python 3 - may possibly work in Py2.7
+    # see section 7.4.2 and also generic.py
+    # think that idea was that hex enncoded streams would pass
+    # unchanged through 7bit email systems
+
+    @staticmethod
     def decode(data, decodeParms=None):
-        retval = ""
-        char = ""
-        x = 0
-        while True:
-            c = data[x]
-            if c == ">":
-                break
-            elif c.isspace():
-                x += 1
-                continue
-            char += c
-            if len(char) == 2:
-                retval += chr(int(char, base=16))
-                char = ""
-            x += 1
-        assert char == ""
-        return retval
 
-    decode = staticmethod(decode)
+        import codecs
 
+        HEX_CODEC = "HEX"
+        HEXSTART = b"<"
+        HEXEND = b">"
+        HEXCHARS = b"0123456789ABCDEFabcdef"
+        WHITESPACE = b" \00\t\n\r\f"
+        EOF = b""
+
+        stream = BytesIO(data)
+
+        tok = stream.read(1)
+        run = b""
+
+        while tok not in (HEXEND, EOF):
+
+            if tok in WHITESPACE:
+                pass
+            elif tok in HEXCHARS:
+                run += tok
+            else:
+                error_message = "Bad character {} in hex stream".format(tok)
+                raise PdfReadError(error_message)
+
+            tok = stream.read(1)
+
+        if len(run) % 2 == 1:
+            run += b"0"
+
+        return codecs.decode(run, HEX_CODEC)
+
+    @staticmethod
     def encode(data):
-        return compress(data)
-
-    encode = staticmethod(encode)
+        return codecs.encode(data, HEX_CODEC)
 
 
 class LZWDecode(object):
@@ -279,7 +294,9 @@ class LZWDecode(object):
 class ASCII85Decode(object):
     """
     Decodes string ASCII85-encoded data into a byte format.
+    this is wrong
     Python 3 standard library can be used here
+
     """
 
     @staticmethod

@@ -50,7 +50,7 @@ from PyPDF2.generic import (
     TextStringObject,
     ByteStringObject,
 )
-from PyPDF2.utils import u_
+from PyPDF2._utils import u_
 
 
 def getRectangle(self, name, defaults):
@@ -85,6 +85,86 @@ def createRectangleAccessor(name, fallback):
         lambda self, value: setRectangle(self, name, value),
         lambda self: deleteRectangle(self, name),
     )
+
+
+class Transformation:
+    """
+    Specify a 2D transformation.
+
+    The transformation between two coordinate systems is represented by a 3-by-3
+    transformation matrix written as follows:
+        a b 0
+        c d 0
+        e f 1
+    Because a transformation matrix has only six elements that can be changed,
+    it is usually specified in PDF as the six-element array [ a b c d e f ].
+
+    Coordinate transformations are expressed as matrix multiplications:
+
+                                 a b 0
+     [ x′ y′ 1 ] = [ x y 1 ] ×   c d 0
+                                 e f 1
+
+    Usage
+    -----
+    >>> from PyPDF2 import Transformation
+    >>> op = Transformation().scale(sx=2, sy=3).translate(tx=10, ty=20)
+    >>> page.mergeTransformedPage(page2, op)
+    """
+
+    # 9.5.4 Coordinate Systems for 3D
+    # 4.2.2 Common Transformations
+    def __init__(self, ctm=(1, 0, 0, 1, 0, 0)):
+        self.ctm = ctm
+
+    @property
+    def matrix(self):
+        return (
+            (self.ctm[0], self.ctm[1], 0),
+            (self.ctm[2], self.ctm[3], 0),
+            (self.ctm[4], self.ctm[5], 1),
+        )
+
+    @staticmethod
+    def compress(matrix):
+        return (
+            matrix[0][0],
+            matrix[0][1],
+            matrix[1][0],
+            matrix[1][1],
+            matrix[0][2],
+            matrix[1][2],
+        )
+
+    def translate(self, tx=0, ty=0):
+        m = self.ctm
+        return Transformation(ctm=(m[0], m[1], m[2], m[3], m[4] + tx, m[5] + ty))
+
+    def scale(self, sx=None, sy=None):
+        if sx is None and sy is None:
+            raise ValueError("Either sx or sy must be specified")
+        if sx is None:
+            sx = sy
+        if sy is None:
+            sy = sx
+        assert sx is not None
+        assert sy is not None
+        op = ((sx, 0, 0), (0, sy, 0), (0, 0, 1))
+        ctm = Transformation.compress(matrix_multiply(self.matrix, op))
+        return Transformation(ctm)
+
+    def rotate(self, rotation):
+        rotation = math.radians(rotation)
+        op = (
+            (math.cos(rotation), math.sin(rotation), 0),
+            (-math.sin(rotation), math.cos(rotation), 0),
+            (0, 0, 1),
+        )
+        ctm = Transformation.compress(matrix_multiply(self.matrix, op))
+        return Transformation(ctm)
+
+    def __repr__(self):
+        return "Transformation(ctm={})".format(self.ctm)
 
 
 class PageObject(DictionaryObject):
@@ -488,8 +568,8 @@ class PageObject(DictionaryObject):
             [0, 0, 1],
         ]
         rtranslation = [[1, 0, 0], [0, 1, 0], [tx, ty, 1]]
-        ctm = utils.matrixMultiply(translation, rotating)
-        ctm = utils.matrixMultiply(ctm, rtranslation)
+        ctm = _utils.matrixMultiply(translation, rotating)
+        ctm = _utils.matrixMultiply(ctm, rtranslation)
 
         return self.mergeTransformedPage(
             page2,
@@ -516,7 +596,7 @@ class PageObject(DictionaryObject):
             [0, 0, 1],
         ]
         scaling = [[scale, 0, 0], [0, scale, 0], [0, 0, 1]]
-        ctm = utils.matrixMultiply(rotating, scaling)
+        ctm = _utils.matrixMultiply(rotating, scaling)
 
         return self.mergeTransformedPage(
             page2,
@@ -540,7 +620,7 @@ class PageObject(DictionaryObject):
 
         translation = [[1, 0, 0], [0, 1, 0], [tx, ty, 1]]
         scaling = [[scale, 0, 0], [0, scale, 0], [0, 0, 1]]
-        ctm = utils.matrixMultiply(scaling, translation)
+        ctm = _utils.matrixMultiply(scaling, translation)
 
         return self.mergeTransformedPage(
             page2,
@@ -573,8 +653,8 @@ class PageObject(DictionaryObject):
             [0, 0, 1],
         ]
         scaling = [[scale, 0, 0], [0, scale, 0], [0, 0, 1]]
-        ctm = utils.matrixMultiply(rotating, scaling)
-        ctm = utils.matrixMultiply(ctm, translation)
+        ctm = _utils.matrixMultiply(rotating, scaling)
+        ctm = _utils.matrixMultiply(ctm, translation)
 
         return self.mergeTransformedPage(
             page2,
@@ -705,6 +785,11 @@ class PageObject(DictionaryObject):
 
         word_space_limit = -80
         text = u_("")
+        
+        if PG.CONTENTS not in self :
+            # Page has no content
+            return text  
+
         content = self[PG.CONTENTS].getObject()
         if not isinstance(content, ContentStream):
             content = ContentStream(content, self.pdf)

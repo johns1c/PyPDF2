@@ -20,11 +20,28 @@ import unicodedata
 import urllib.request
 
 import PyPDF2
+from PyPDF2.errors import PdfReadError
 from PyPDF2.filters import *
 from PyPDF2.generic import *
-from PyPDF2.utils import glyph2unicode
+from PyPDF2._utils import glyph2unicode
 
 TRACE = False
+FOURTEEN_STANDARD_FONTS = (
+    "/Courier",
+    "/Courier-Bold",
+    "/Courier-BoldOblique",
+    "/Courier-Oblique",
+    "/Helvetica",
+    "/Helvetica-Bold",
+    "/Helvetica-BoldOblique",
+    "/Helvetica-Oblique",
+    "/Symbol",
+    "/Times-Bold",
+    "/Times-BoldItalic",
+    "/Times-Italic",
+    "/Times-Roman",
+    "/ZapfDingbats",
+)
 
 
 class toUnicode(DictionaryObject):
@@ -383,7 +400,7 @@ class toUnicode(DictionaryObject):
             msg = "ToUnicode data is {} not bytes or bytestream ????".format(
                 type(source)
             )
-            utils.PdfReadError(msg)
+            PdfReadError(msg)
 
         last_pos = -1
         pos = source.tell()
@@ -842,10 +859,17 @@ def FetchFontExtended(currentobject, id, Debug=False):
     elif current_font["/BaseFont"] in ("/Symbol", "/ZapfDingbats"):  # 4
         encoding = current_font["/BaseFont"]
 
-    elif font_subtype in ("/Type3"):  # 5
+    elif current_font_subtype in ("/Type3"):  # 5
         if debug:
             print(key, "+=+=+ /Type3 fonts not handled yet")
         encoding = None
+
+    elif current_font["/BaseFont"] in FOURTEEN_STANDARD_FONTS:  # 6
+        # well 12 actually as Symbol and Dingbats have been handled above
+        # so as encoding is not specified (assuming it is not dependent on
+        # the platform
+        encoding = "/StandardEncoding"
+
     else:
         if debug:
             print(key, "+=+=+ unable to obtain font encoding +=")

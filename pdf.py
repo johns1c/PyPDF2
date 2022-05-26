@@ -73,10 +73,10 @@ from PyPDF2.constants import StreamAttributes as SA
 from PyPDF2.constants import TrailerKeys as TK
 from PyPDF2.errors import PageSizeNotDefinedError, PdfReadError, PdfReadWarning
 
-from . import utils
+from . import _utils
 from .generic import *
 from .toUnicode import *
-from .utils import (
+from ._utils import (
     ConvertFunctionsToVirtualList,
     b_,
     formatWarning,

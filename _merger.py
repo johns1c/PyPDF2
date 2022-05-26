@@ -25,24 +25,18 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from sys import version_info
+
+from io import BytesIO
+from io import FileIO as file
 
 from PyPDF2._reader import PdfFileReader
+from PyPDF2._utils import isString, str_
 from PyPDF2._writer import PdfFileWriter
 from PyPDF2.constants import PagesAttributes as PA
 from PyPDF2.generic import *
 from PyPDF2.pagerange import PageRange
-from PyPDF2.utils import isString, str_
 
-if version_info < (3, 0):
-    from cStringIO import StringIO
-
-    StreamIO = StringIO
-else:
-    from io import BytesIO
-    from io import FileIO as file
-
-    StreamIO = BytesIO
+ERR_CLOSED_WRITER = "close() was called and thus the writer cannot be used anymore"
 
 
 class _MergedPage(object):
@@ -116,10 +110,11 @@ class PdfFileMerger(object):
 
         # If the fileobj parameter is a string, assume it is a path
         # and create a file object at that location. If it is a file,
-        # copy the file's contents into a BytesIO (or StreamIO) stream object; if
+        # copy the file's contents into a BytesIO stream object; if
         # it is a PdfFileReader, copy that reader's stream into a
-        # BytesIO (or StreamIO) stream.
+        # BytesIO stream.
         # If fileobj is none of the above types, it is not modified
+
         decryption_key = None
         if isString(fileobj):
             fileobj = file(fileobj, "rb")
@@ -127,7 +122,7 @@ class PdfFileMerger(object):
         elif hasattr(fileobj, "seek") and hasattr(fileobj, "read"):
             fileobj.seek(0)
             filecontent = fileobj.read()
-            fileobj = StreamIO(filecontent)
+            fileobj = BytesIO(filecontent)
             my_file = True
         elif isinstance(fileobj, PdfFileReader):
             if hasattr(fileobj, "_decryption_key"):
@@ -140,7 +135,7 @@ class PdfFileMerger(object):
             my_file = True
 
         # Create a new PdfFileReader instance using the stream
-        # (either file or BytesIO or StringIO) created above
+        # (either file or BytesIO) created above
         pdfr = PdfFileReader(
             fileobj, strict=self.strict, overwriteWarnings=self.overwriteWarnings
         )
@@ -272,6 +267,8 @@ class PdfFileMerger(object):
             and each value is your new metadata.
             Example: ``{u'/Title': u'My title'}``
         """
+        if self.output is None:
+            raise RuntimeError(ERR_CLOSED_WRITER)
         self.output.addMetadata(infos)
 
     def setPageLayout(self, layout):
@@ -530,6 +527,9 @@ class PdfFileMerger(object):
         :param str fit: The fit of the destination page. See
             :meth:`addLink()<addLin>` for details.
         """
+        if self.output is None:
+            raise RuntimeError(ERR_CLOSED_WRITER)
+
         if len(self.output.getObject(self.output._pages)["/Kids"]) > 0:
             page_ref = self.output.getObject(self.output._pages)["/Kids"][pagenum]
         else:

@@ -35,9 +35,16 @@ import warnings
 from hashlib import md5
 from sys import version_info
 
-from PyPDF2 import utils
+from PyPDF2 import _utils
 from PyPDF2._page import PageObject
-from PyPDF2._security import _alg33_1, _alg34, _alg35
+from PyPDF2._security import RC4_encrypt, _alg33_1, _alg34, _alg35
+from PyPDF2._utils import (
+    ConvertFunctionsToVirtualList,
+    b_,
+    formatWarning,
+    isString,
+    readUntilWhitespace,
+)
 from PyPDF2.constants import CatalogAttributes as CA
 from PyPDF2.constants import Core as CO
 from PyPDF2.constants import DocumentInformationAttributes as DI
@@ -63,13 +70,6 @@ from PyPDF2.generic import (
     createStringObject,
     readNonWhitespace,
     readObject,
-)
-from PyPDF2.utils import (
-    ConvertFunctionsToVirtualList,
-    b_,
-    formatWarning,
-    isString,
-    readUntilWhitespace,
 )
 
 if version_info < (3, 0):
@@ -530,6 +530,7 @@ class PdfFileReader(object):
                     # so continue to load the file without the Bookmarks
                     return outlines
 
+                # TABLE 8.3 Entries in the outline dictionary
                 if "/First" in lines:
                     node = lines["/First"]
             self._namedDests = self.getNamedDestinations()
@@ -757,18 +758,17 @@ class PdfFileReader(object):
             stream_data.seek(obj_stm["/First"] + offset, 0)
             try:
                 obj = readObject(stream_data, self)
-            except PdfStreamError as e:
+            except PdfStreamError as exc:
                 # Stream object cannot be read. Normally, a critical error, but
                 # Adobe Reader doesn't complain, so continue (in strict mode?)
-                e = sys.exc_info()[1]
                 warnings.warn(
                     "Invalid stream (index %d) within object %d %d: %s"
-                    % (i, indirectReference.idnum, indirectReference.generation, e),
+                    % (i, indirect_reference.idnum, indirect_reference.generation, exc),
                     PdfReadWarning,
                 )
 
                 if self.strict:
-                    raise PdfReadError("Can't read object stream: %s" % e)
+                    raise PdfReadError("Can't read object stream: %s" % exc)
                 # Replace with null. Hopefully it's nothing important.
                 obj = NullObject()
             return obj
@@ -852,9 +852,9 @@ class PdfFileReader(object):
 
     def _decryptObject(self, obj, key):
         if isinstance(obj, (ByteStringObject, TextStringObject)):
-            obj = createStringObject(utils.RC4_encrypt(key, obj.original_bytes))
+            obj = createStringObject(RC4_encrypt(key, obj.original_bytes))
         elif isinstance(obj, StreamObject):
-            obj._data = utils.RC4_encrypt(key, obj._data)
+            obj._data = RC4_encrypt(key, obj._data)
         elif isinstance(obj, DictionaryObject):
             for dictkey, value in list(obj.items()):
                 obj[dictkey] = self._decryptObject(value, key)
@@ -869,14 +869,14 @@ class PdfFileReader(object):
         # object header.  In reality... some files have stupid cross reference
         # tables that are off by whitespace bytes.
         extra = False
-        utils.skipOverComment(stream)
-        extra |= utils.skipOverWhitespace(stream)
+        _utils.skipOverComment(stream)
+        extra |= _utils.skipOverWhitespace(stream)
         stream.seek(-1, 1)
         idnum = readUntilWhitespace(stream)
-        extra |= utils.skipOverWhitespace(stream)
+        extra |= _utils.skipOverWhitespace(stream)
         stream.seek(-1, 1)
         generation = readUntilWhitespace(stream)
-        extra |= utils.skipOverWhitespace(stream)
+        extra |= _utils.skipOverWhitespace(stream)
         stream.seek(-1, 1)
 
         # although it's not used, it might still be necessary to read
@@ -1360,14 +1360,14 @@ class PdfFileReader(object):
             key = _alg33_1(password, rev, keylen)
             real_O = encrypt["/O"].getObject()
             if rev == 2:
-                userpass = utils.RC4_encrypt(key, real_O)
+                userpass = RC4_encrypt(key, real_O)
             else:
                 val = real_O
                 for i in range(19, -1, -1):
                     new_key = b_("")
                     for l in range(len(key)):
-                        new_key += b_(chr(utils.ord_(key[l]) ^ i))
-                    val = utils.RC4_encrypt(new_key, val)
+                        new_key += b_(chr(_utils.ord_(key[l]) ^ i))
+                    val = RC4_encrypt(new_key, val)
                 userpass = val
             owner_password, key = self._authenticateUserPassword(userpass)
             if owner_password:
