@@ -33,6 +33,7 @@ __author_email__ = "biziqe@mathieu.fenniak.net"
 
 
 import sys
+import warnings
 
 # See https://github.com/py-pdf/PyPDF2/issues/779
 from PyPDF2.errors import (  # noqa
