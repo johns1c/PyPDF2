@@ -763,7 +763,7 @@ class PdfFileReader(object):
                 # Adobe Reader doesn't complain, so continue (in strict mode?)
                 warnings.warn(
                     "Invalid stream (index %d) within object %d %d: %s"
-                    % (i, indirect_reference.idnum, indirect_reference.generation, exc),
+                    % (i, indirectReference.idnum, indirectReference.generation, exc),
                     PdfReadWarning,
                 )
 
