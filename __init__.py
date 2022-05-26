@@ -20,5 +20,6 @@ __all__ = [
     "PdfFileReader",
     "PdfFileWriter",
     "toUnicode",
-    "Transformation" 
+    "Transformation",
+    "utils", 
 ]
