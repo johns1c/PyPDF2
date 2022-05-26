@@ -293,90 +293,25 @@ class LZWDecode(object):
 
 class ASCII85Decode(object):
     """
-    Decodes string ASCII85-encoded data into a byte format.
-    this is wrong
-    Python 3 standard library can be used here
+
+    ASCII85 stream encoding / decoding.  Python 3 only
+    the @staticmethod gives an issue with python < 3.10
 
     """
 
     @staticmethod
     def decode(data, decodeParms=None):
-        if version_info < (3, 0):
-            retval = ""
-            group = []
-            x = 0
-            hit_eod = False
-            # remove all whitespace from data
-            data = [y for y in data if y not in " \n\r\t"]
-            while not hit_eod:
-                c = data[x]
-                if len(retval) == 0 and c == "<" and data[x + 1] == "~":
-                    x += 2
-                    continue
-                # elif c.isspace():
-                #    x += 1
-                #    continue
-                elif c == b"z":
-                    assert len(group) == 0
-                    retval += "\x00\x00\x00\x00"
-                    x += 1
-                    continue
-                elif c == b"~" and data[x + 1] == b">":
-                    if len(group) != 0:
-                        # cannot have a final group of just 1 char
-                        assert len(group) > 1
-                        cnt = len(group) - 1
-                        group += [85, 85, 85]
-                        hit_eod = cnt
-                    else:
-                        break
-                else:
-                    c = ord(c) - 33
-                    assert c >= 0 and c < 85
-                    group += [c]
-                if len(group) >= 5:
-                    b = (
-                        group[0] * (85**4)
-                        + group[1] * (85**3)
-                        + group[2] * (85**2)
-                        + group[3] * 85
-                        + group[4]
-                    )
-                    assert b < (2**32 - 1)
-                    c4 = chr((b >> 0) % 256)
-                    c3 = chr((b >> 8) % 256)
-                    c2 = chr((b >> 16) % 256)
-                    c1 = chr(b >> 24)
-                    retval += c1 + c2 + c3 + c4
-                    if hit_eod:
-                        retval = retval[: -4 + hit_eod]
-                    group = []
-                x += 1
-            return retval
-        else:
-            if isinstance(data, str):
-                data = data.encode("ascii")
-            n = b = 0
-            out = bytearray()
-            for c in data:
-                if ord("!") <= c and c <= ord("u"):
-                    n += 1
-                    b = b * 85 + (c - 33)
-                    if n == 5:
-                        out += struct.pack(b">L", b)
-                        n = b = 0
-                elif c == ord("z"):
-                    assert n == 0
-                    out += b"\0\0\0\0"
-                elif c == ord("~"):
-                    if n:
-                        for _ in range(5 - n):
-                            b = b * 85 + 84
-                        out += struct.pack(b">L", b)[: n - 1]
-                    break
-            return bytes(out)
+        assert isinstance(data, bytes)
+        return base64.a85decode(data)
 
     decode = staticmethod(decode)
+
+    def encode(data):
+
+        assert isinstance(data, bytes)
+        return base64.a85encode(data)
+
+    encode = staticmethod(encode)
 
 
 class DCTDecode(object):
