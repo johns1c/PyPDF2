@@ -757,6 +757,7 @@ class NameObject(str, PdfObject):
                 warnings.warn("Illegal character in Name Object", PdfReadWarning)
                 return NameObject(name)
             else:
+                e = e
                 raise PdfReadError("Illegal character in Name Object")
 
     readFromStream = staticmethod(readFromStream)
@@ -851,7 +852,7 @@ class DictionaryObject(dict, PdfObject):
             stream.seek(-1, 1)
             value = readObject(stream, pdf)
             try:
-                _new_key = not data.get(key)
+                _ = not data.get(key)
             except Exception:
                 print("problem with key ", type(key), key)
                 print("value ", value)
@@ -872,7 +873,7 @@ class DictionaryObject(dict, PdfObject):
                     PdfReadWarning,
                 )
 
-        db_here = stream.tell()
+        db_here = stream.tell()  # noqa F841
 
         pos = stream.tell()
         s = readNonWhitespace(stream)
@@ -909,7 +910,7 @@ class DictionaryObject(dict, PdfObject):
                 if b"endstream" in terminator:
                     print("OK")
                 else:
-                    more_stuff = stream.read(50)
+                    more_stuff = stream.read(50)  # noqa
                     # print("More stuff", more_stuff)
                     stream.seek(term_pos - 30)
                     # less_stuff = stream.read(50)

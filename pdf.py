@@ -42,41 +42,29 @@
 __author__ = "Mathieu Fenniak"
 __author_email__ = "biziqe@mathieu.fenniak.net"
 
-import math
-import struct
-import sys
-import uuid
-from sys import version_info
-
-if version_info < (3, 0):
-    from cStringIO import StringIO
-
-    BytesIO = StringIO
-else:
-    from io import BytesIO
-
-import codecs
-import warnings
-from hashlib import md5
 
 from PyPDF2._page import *  # noqa: F401
 from PyPDF2._reader import *  # noqa: F401
 from PyPDF2._writer import *  # noqa: F401
 
 
-from PyPDF2.constants import CatalogAttributes as CA
-from PyPDF2.constants import Core as CO
-from PyPDF2.constants import PageAttributes as PG
-from PyPDF2.constants import PagesAttributes as PA
-from PyPDF2.constants import Ressources as RES
-from PyPDF2.constants import StreamAttributes as SA
-from PyPDF2.constants import TrailerKeys as TK
-from PyPDF2.errors import PageSizeNotDefinedError, PdfReadError, PdfReadWarning
+from PyPDF2.constants import CatalogAttributes as CA  # noqa: F401
+from PyPDF2.constants import Core as CO  # noqa: F401
+from PyPDF2.constants import PageAttributes as PG  # noqa: F401
+from PyPDF2.constants import PagesAttributes as PA  # noqa: F401
+from PyPDF2.constants import Ressources as RES  # noqa: F401
+from PyPDF2.constants import StreamAttributes as SA  # noqa: F401
+from PyPDF2.constants import TrailerKeys as TK  # noqa: F401
+from PyPDF2.errors import (  # noqa: F401
+    PageSizeNotDefinedError,
+    PdfReadError,
+    PdfReadWarning,
+)
 
-from . import _utils
-from .generic import *
-from .toUnicode import *
-from ._utils import (
+from . import _utils  # noqa: F401
+from .generic import *  # noqa: F401
+from .toUnicode import *  # noqa: F401
+from ._utils import (  # noqa: F401
     ConvertFunctionsToVirtualList,
     b_,
     formatWarning,

@@ -51,6 +51,7 @@ from PyPDF2.generic import (
     ByteStringObject,
 )
 from PyPDF2._utils import u_
+from PyPDF2._utils import matrixMultiply as matrix_multiply
 
 
 def getRectangle(self, name, defaults):
@@ -568,8 +569,8 @@ class PageObject(DictionaryObject):
             [0, 0, 1],
         ]
         rtranslation = [[1, 0, 0], [0, 1, 0], [tx, ty, 1]]
-        ctm = _utils.matrixMultiply(translation, rotating)
-        ctm = _utils.matrixMultiply(ctm, rtranslation)
+        ctm = matrix_multiply(translation, rotating)
+        ctm = matrix_multiply(ctm, rtranslation)
 
         return self.mergeTransformedPage(
             page2,
@@ -596,7 +597,7 @@ class PageObject(DictionaryObject):
             [0, 0, 1],
         ]
         scaling = [[scale, 0, 0], [0, scale, 0], [0, 0, 1]]
-        ctm = _utils.matrixMultiply(rotating, scaling)
+        ctm = matrix_multiply(rotating, scaling)
 
         return self.mergeTransformedPage(
             page2,
@@ -620,7 +621,7 @@ class PageObject(DictionaryObject):
 
         translation = [[1, 0, 0], [0, 1, 0], [tx, ty, 1]]
         scaling = [[scale, 0, 0], [0, scale, 0], [0, 0, 1]]
-        ctm = _utils.matrixMultiply(scaling, translation)
+        ctm = matrix_multiply(scaling, translation)
 
         return self.mergeTransformedPage(
             page2,
@@ -653,8 +654,8 @@ class PageObject(DictionaryObject):
             [0, 0, 1],
         ]
         scaling = [[scale, 0, 0], [0, scale, 0], [0, 0, 1]]
-        ctm = _utils.matrixMultiply(rotating, scaling)
-        ctm = _utils.matrixMultiply(ctm, translation)
+        ctm = matrix_multiply(rotating, scaling)
+        ctm = matrix_multiply(ctm, translation)
 
         return self.mergeTransformedPage(
             page2,
@@ -785,10 +786,10 @@ class PageObject(DictionaryObject):
 
         word_space_limit = -80
         text = u_("")
-        
-        if PG.CONTENTS not in self :
+
+        if PG.CONTENTS not in self:
             # Page has no content
-            return text  
+            return text
 
         content = self[PG.CONTENTS].getObject()
         if not isinstance(content, ContentStream):

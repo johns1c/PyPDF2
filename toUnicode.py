@@ -16,7 +16,8 @@
 #
 # Chris  Johnson
 import io
-import unicodedata
+
+# mport unicodedata
 import urllib.request
 
 import PyPDF2
@@ -58,7 +59,7 @@ class toUnicode(DictionaryObject):
         diffs=None,
         debug=False,
     ):
-        ErrorMessage = "ToUnicode parse error found {} expecting {} "
+        # ErrorMessage = "ToUnicode parse error found {} expecting {} "
         self.StandardCodecs = [
             "/StandardEncoding",
             "/MacRomanEncoding",
@@ -95,7 +96,7 @@ class toUnicode(DictionaryObject):
             b"/MacExpertEncoding",
         ]
 
-        x = ErrorMessage.format("#", "#")
+        # x = ErrorMessage.format("#", "#")
         self.id = id
         self.loaded = loaded
         self.fchars = fchars
@@ -217,12 +218,12 @@ class toUnicode(DictionaryObject):
                 if debug:
                     self.tell(What="All")
 
-        BFROM = 0
-        BTO = 1
-        BREL = bfrom = 1
+        BFROM = 0  # noqa: F841
+        BTO = 1  # noqa: F841
+        BREL = bfrom = 1  # noqa: F841
 
         i = 0
-        o = 0
+        # o = 0
         utf16_result = bytearray(b"")
 
         while i < len(codebytes):
@@ -341,7 +342,7 @@ class toUnicode(DictionaryObject):
             according to the VM allocation mode.
             """
             try:
-                size = operand.pop()
+                size = operand.pop()  # noqa: F841
                 empty_dict = DictionaryObject()
                 operand.append(empty_dict)
             except:
@@ -392,7 +393,7 @@ class toUnicode(DictionaryObject):
             print(source)
         if isinstance(source, io.BytesIO):
             pass  # as its what we expect
-            source_pos = source.tell()
+            source_pos = source.tell()  # noqa: F841
         elif isinstance(source, bytes):
             # streamify it
             source = io.BytesIO(source)
@@ -484,7 +485,7 @@ class toUnicode(DictionaryObject):
 
                         t1 = l.find(b";")
                         t2 = l.find(b";", t1 + 1)
-                        t3 = l.find(b";", t2 + 1)
+                        t3 = l.find(b";", t2 + 1)  # noqa: F841
                         if site == aglfn:
                             hex = l[:t1]
                             glyph = l[t1 + 1 : t2]
@@ -584,7 +585,7 @@ class toUnicode(DictionaryObject):
         elif isinstance(esource, PyPDF2.generic.DictionaryObject):
             enc = esource["/BaseEncoding"]
             dfs = esource["/Differences"]
-            _ucodes = toUnicode.checkDiffs(dfs)
+            _ucodes = toUnicode.checkDiffs(dfs)  # noqa 841
             if dfs:
                 note = " with differences "
             else:
@@ -651,7 +652,7 @@ class toUnicode(DictionaryObject):
         #
 
         if self.baseencoding in base_codecs:
-            codec = base_codecs[self.baseencoding]
+            codec = base_codecs[self.baseencoding]  # noqa 841
             if self.diffs:
                 if debug:
                     print("xlatebytes has diffs - bytewise tranlation")
@@ -794,33 +795,30 @@ def FetchFontExtended(currentobject, id, Debug=False):
     # print( "~~~~~~~~~~~~~~~~~~~toUnicode.py~~~~~~")
     debug = Debug
 
-    pdf_fonts = {}
-    pdf_fonts2u = {}
-    pdf_font_subtypes = {}
-    pdf_font_encodings = {}
+    pdf_fonts = {}  # noqa: F841
+    pdf_fonts2u = {}  # noqa: F841
+    pdf_font_subtypes = {}  # noqa: F841
+    pdf_font_encodings = {}  # noqa: F841
 
-    fonts = {}
     try:
-
         current_font = currentobject["/Resources"]["/Font"][id].getObject()
         current_font_subtype = current_font["/Subtype"]
         current_font_encoding = current_font["/Encoding"]
         current_font_to_unicode = current_font["/ToUnicode"]
     except KeyError:
-        fonts = {}
         print("page has no fonts")
         return None, None  # pdf_fonts, ue
     except:
         print("unknown error retrieving fonts for page")
         return None, None  # pdf_fonts, ue
     """            character interpretation
-              1   /ToUnicode 
+              1   /ToUnicode
               2   /Differences in encoding object
               3   /Encoding
               4   implied by /Symbol or /ZapfDingbats font
               5   a mapping via Type3 (mixed font) font - potentially recursively
               6   Implied by one of other 14 standard fonts i.e. Latin-1
-              7   Held within the font itself   
+              7   Held within the font itself
             """
 
     if False:

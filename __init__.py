@@ -1,5 +1,6 @@
-#from PyPDF2 import pdf
-import PyPDF2,_utils as utils
+# from PyPDF2 import pdf
+import PyPDF2  # noqa F401
+import PyPDF2._utils as utils  # noqa F401
 from PyPDF2._reader import DocumentInformation, PdfFileReader
 from PyPDF2._version import __version__
 from PyPDF2._writer import PdfFileWriter
@@ -21,5 +22,5 @@ __all__ = [
     "PdfFileWriter",
     "toUnicode",
     "Transformation",
-    "utils", 
+    "utils",
 ]

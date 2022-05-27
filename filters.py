@@ -32,16 +32,24 @@ import math
 import struct
 import zlib
 from io import BytesIO
-from sys import version_info
 
-from .constants import CcittFaxDecodeParameters as CCITT
-from .constants import ColorSpaces
+from .constants import CcittFaxDecodeParameters as CCITT  # noqa F401
+from .constants import ColorSpaces  # noqa F401
 from .constants import FilterTypeAbbreviations as FTA
 from .constants import FilterTypes as FT
 from .constants import ImageAttributes as IA
-from .constants import LzwFilterParameters as LZW
+from .constants import LzwFilterParameters as LZW  # noqa F401
 from .constants import StreamAttributes as SA
 from .errors import PdfReadError
+
+import codecs
+
+HEX_CODEC = "HEX"
+HEXSTART = b"<"
+HEXEND = b">"
+HEXCHARS = b"0123456789ABCDEFabcdef"
+WHITESPACE = b" \00\t\n\r\f"
+EOF = b""
 
 
 def decompress(data):
@@ -162,15 +170,6 @@ class ASCIIHexDecode(object):
     @staticmethod
     def decode(data, decodeParms=None):
 
-        import codecs
-
-        HEX_CODEC = "HEX"
-        HEXSTART = b"<"
-        HEXEND = b">"
-        HEXCHARS = b"0123456789ABCDEFabcdef"
-        WHITESPACE = b" \00\t\n\r\f"
-        EOF = b""
-
         stream = BytesIO(data)
 
         tok = stream.read(1)
@@ -195,6 +194,10 @@ class ASCIIHexDecode(object):
 
     @staticmethod
     def encode(data):
+
+        # import codecs
+        # HEX_CODEC = "HEX"
+
         return codecs.encode(data, HEX_CODEC)
 
 
